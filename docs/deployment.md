@@ -69,10 +69,7 @@ The budget resource is only created when `budget_contact_emails` has at least on
 After Terraform finishes, set these GitHub repository secrets:
 
 ```text
-AZURE_CLIENT_ID
-AZURE_CLIENT_SECRET
-AZURE_TENANT_ID
-AZURE_SUBSCRIPTION_ID
+AZURE_CREDENTIALS
 AZURE_RESOURCE_GROUP
 AZURE_CONTAINER_APP_NAME
 ACR_LOGIN_SERVER
@@ -110,17 +107,17 @@ Create the Azure service principal used by the backend workflow:
 az ad sp create-for-rbac \
   --name cloudapp-github-actions \
   --role contributor \
-  --scopes /subscriptions/$(az account show --query id -o tsv)/resourceGroups/$(terraform output -raw resource_group_name)
+  --scopes /subscriptions/$(az account show --query id -o tsv)/resourceGroups/$(terraform output -raw resource_group_name) \
+  --sdk-auth
 ```
 
 Copy the command output into GitHub repository secrets:
 
 ```text
-AZURE_CLIENT_ID=<appId>
-AZURE_CLIENT_SECRET=<password>
-AZURE_TENANT_ID=<tenant>
-AZURE_SUBSCRIPTION_ID=<your subscription id>
+AZURE_CREDENTIALS=<full JSON output>
 ```
+
+The `AZURE_CREDENTIALS` JSON must include `clientId`, `clientSecret`, `tenantId`, and `subscriptionId`.
 
 Your current subscription values:
 
