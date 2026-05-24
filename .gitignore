@@ -28,5 +28,5 @@ override.tf.json
 
 .DS_Store
 
-terraform.tfvars.example
 .env.example
+.env

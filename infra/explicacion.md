@@ -73,12 +73,12 @@ Guarda valores sensibles como:
 
 ```text
 DATABASE_URL
-GEMINI_API_KEY
+OPENAI_API_KEY
 DATABRICKS_HOST
 DATAHUB_SERVER
 ```
 
-En fase 1, Gemini, Databricks y DataHub son placeholders. Se preparan para fases futuras, pero no se usan todavia como funcionalidades principales.
+En fase 1, OpenAI, Databricks y DataHub se preparan como integraciones. En fase 2 se activa OpenAI para Query Governance y DBA Copilot; Databricks y DataHub quedan para fases posteriores.
 
 Funcion: evitar que claves, passwords o URLs sensibles queden escritas directamente en el codigo.
 

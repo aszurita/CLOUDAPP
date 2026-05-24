@@ -7,4 +7,4 @@
 5. Show services and latest deployments.
 6. Open Azure Portal and show Container Apps, PostgreSQL, Key Vault, Log Analytics, ACR, and Static Web Apps.
 7. Show GitHub Actions workflows for frontend and backend.
-8. Explain that Databricks, DataHub/Purview, and Gemini are intentionally prepared as placeholders for later phases.
+8. Explain that Databricks and DataHub/Purview are intentionally prepared as placeholders, while phase 2 activates OpenAI for Query Governance.

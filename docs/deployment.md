@@ -76,7 +76,7 @@ ACR_LOGIN_SERVER
 ACR_USERNAME
 ACR_PASSWORD
 AZURE_STATIC_WEB_APPS_API_TOKEN
-GEMINI_API_KEY
+OPENAI_API_KEY
 ```
 
 Useful Terraform output commands:
@@ -154,4 +154,18 @@ Update `frontend_origin` in Terraform after Static Web Apps has a public hostnam
 
 Terraform creates the Container App with a public placeholder image first. The backend workflow replaces it with the FastAPI image. Terraform keeps ingress on port `8000` and ignores later image changes so future `terraform apply` runs do not roll the app back to the placeholder image.
 
-For local development, copy `backend/.env.example` to `backend/.env` and put your real Gemini key in `GEMINI_API_KEY`. Never commit `.env`.
+For local development, copy `backend/.env.example` to `backend/.env` and put your real OpenAI key in `OPENAI_API_KEY`. Never commit `.env`.
+
+For phase 2 production, rotate any exposed OpenAI key before use, then update Azure manually so the secret does not appear in Terraform files:
+
+```bash
+az keyvault secret set \
+  --vault-name kv-cloudapp-dev-zgc5ku \
+  --name OPENAI-API-KEY \
+  --value "<new-openai-api-key>"
+
+az containerapp secret set \
+  --name ca-cloudapp-dev-api \
+  --resource-group rg-cloudapp-dev \
+  --secrets openai-api-key="<new-openai-api-key>"
+```

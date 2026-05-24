@@ -1,0 +1,10 @@
+project_name                = "cloudapp"
+environment                 = "dev"
+location                    = "eastus"
+postgres_location           = "mexicocentral"
+postgres_server_name_suffix = ""
+static_web_app_location     = "eastus2"
+budget_amount_usd           = 20
+budget_contact_emails       = []
+frontend_origin             = "http://localhost:5173"
+allowed_client_ip           = ""

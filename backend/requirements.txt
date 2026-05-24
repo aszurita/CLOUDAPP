@@ -1,8 +1,10 @@
 alembic==1.13.3
 fastapi==0.115.0
 httpx==0.27.2
+openai>=1.93.0,<3.0.0
 psycopg[binary]==3.2.2
 pydantic-settings==2.5.2
 pytest==8.3.3
 sqlalchemy==2.0.35
+sqlparse==0.5.1
 uvicorn[standard]==0.30.6

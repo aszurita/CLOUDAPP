@@ -12,17 +12,27 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     database_url: str = "sqlite:///./cloudapp.db"
     frontend_origins: str = "http://localhost:5173"
-    ai_provider: str = "gemini"
+    ai_provider: str = "openai"
+    openai_api_key: str | None = None
+    openai_model: str = "chat-latest"
+    openai_max_output_tokens: int = 800
+    openai_temperature: float = 0.2
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str | None = None
     databricks_host: str | None = None
     datahub_server: str | None = None
 
     @property
     def ai_configured(self) -> bool:
-        if self.ai_provider != "gemini" or not self.gemini_api_key:
+        if self.ai_provider != "openai" or not self.openai_api_key:
             return False
-        return not self.gemini_api_key.startswith("phase-")
+        return not self.openai_api_key.startswith("phase-")
+
+    @property
+    def ai_model(self) -> str:
+        if self.ai_provider == "openai":
+            return self.openai_model
+        return self.gemini_model or "not-configured"
 
     @property
     def frontend_origin_list(self) -> list[str]:

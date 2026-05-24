@@ -111,9 +111,9 @@ resource "azurerm_key_vault_secret" "database_url" {
   depends_on   = [azurerm_key_vault_access_policy.deployer]
 }
 
-resource "azurerm_key_vault_secret" "gemini_placeholder" {
-  name         = "GEMINI-API-KEY"
-  value        = "phase-5-placeholder"
+resource "azurerm_key_vault_secret" "openai_placeholder" {
+  name         = "OPENAI-API-KEY"
+  value        = "phase-2-placeholder"
   key_vault_id = azurerm_key_vault.main.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
 }
@@ -153,8 +153,8 @@ resource "azurerm_container_app" "backend" {
   }
 
   secret {
-    name  = "gemini-api-key"
-    value = azurerm_key_vault_secret.gemini_placeholder.value
+    name  = "openai-api-key"
+    value = azurerm_key_vault_secret.openai_placeholder.value
   }
 
   secret {
@@ -205,17 +205,27 @@ resource "azurerm_container_app" "backend" {
 
       env {
         name  = "AI_PROVIDER"
-        value = "gemini"
+        value = "openai"
       }
 
       env {
-        name  = "GEMINI_MODEL"
-        value = "gemini-2.5-flash"
+        name  = "OPENAI_MODEL"
+        value = "chat-latest"
       }
 
       env {
-        name        = "GEMINI_API_KEY"
-        secret_name = "gemini-api-key"
+        name  = "OPENAI_MAX_OUTPUT_TOKENS"
+        value = "800"
+      }
+
+      env {
+        name  = "OPENAI_TEMPERATURE"
+        value = "0.2"
+      }
+
+      env {
+        name        = "OPENAI_API_KEY"
+        secret_name = "openai-api-key"
       }
     }
   }

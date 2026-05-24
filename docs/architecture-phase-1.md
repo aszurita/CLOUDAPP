@@ -18,4 +18,4 @@ Supporting services:
 - Azure Monitor and Log Analytics receive backend logs.
 - GitHub Actions runs CI/CD for frontend and backend.
 
-Phase 1 intentionally leaves Databricks, DataHub/Purview, and Gemini as placeholders so phase 2 can focus on Query Governance without platform churn.
+Phase 1 intentionally leaves Databricks and DataHub/Purview as placeholders. Phase 2 activates OpenAI for Query Governance and DBA Copilot without platform churn.
