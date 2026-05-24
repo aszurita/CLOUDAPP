@@ -95,6 +95,23 @@ terraform output -raw container_app_url
 terraform output -raw static_web_app_default_host_name
 ```
 
+For the current phase 1 Azure deployment, the non-sensitive values should look like this:
+
+```text
+AZURE_RESOURCE_GROUP=rg-cloudapp-dev
+AZURE_CONTAINER_APP_NAME=ca-cloudapp-dev-api
+ACR_LOGIN_SERVER=acrcloudappdevzgc5ku.azurecr.io
+VITE_API_BASE_URL=https://ca-cloudapp-dev-api--upevfyl.delightfulsea-04be8a68.eastus.azurecontainerapps.io
+```
+
+Create `AZURE_STATIC_WEB_APPS_API_TOKEN` from:
+
+```bash
+terraform output -raw static_web_app_api_key
+```
+
+Do not paste Terraform state files, `.env`, or `.tfvars` into GitHub. Only paste the individual secret values into GitHub repository secrets.
+
 Update `frontend_origin` in Terraform after Static Web Apps has a public hostname, then run `terraform apply` again so backend CORS accepts the deployed portal.
 
 Terraform creates the Container App with a public placeholder image first. The backend workflow replaces it with the FastAPI image and switches ingress to port `8000`.
