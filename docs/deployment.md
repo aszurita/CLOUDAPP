@@ -76,7 +76,6 @@ ACR_LOGIN_SERVER
 ACR_USERNAME
 ACR_PASSWORD
 AZURE_STATIC_WEB_APPS_API_TOKEN
-VITE_API_BASE_URL
 GEMINI_API_KEY
 ```
 
@@ -134,6 +133,8 @@ AZURE_CONTAINER_APP_NAME=ca-cloudapp-dev-api
 ACR_LOGIN_SERVER=acrcloudappdevzgc5ku.azurecr.io
 VITE_API_BASE_URL=https://ca-cloudapp-dev-api.delightfulsea-04be8a68.eastus.azurecontainerapps.io
 ```
+
+`VITE_API_BASE_URL` is a public frontend build value. It is defined directly in `.github/workflows/frontend-ci-cd.yml` for phase 1, so it does not need to be stored as a GitHub Secret.
 
 The deployed frontend origin should be configured in Terraform so the backend CORS policy accepts browser requests:
 

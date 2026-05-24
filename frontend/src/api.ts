@@ -1,4 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const DEFAULT_API_BASE_URL = import.meta.env.DEV
+  ? "http://localhost:8000"
+  : "https://ca-cloudapp-dev-api.delightfulsea-04be8a68.eastus.azurecontainerapps.io";
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
 
 export type PlatformStatus = {
   app_name: string;
