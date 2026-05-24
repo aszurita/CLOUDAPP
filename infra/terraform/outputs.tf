@@ -20,7 +20,7 @@ output "container_app_name" {
 }
 
 output "container_app_url" {
-  value = "https://${azurerm_container_app.backend.latest_revision_fqdn}"
+  value = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
 }
 
 output "static_web_app_name" {

@@ -170,7 +170,7 @@ resource "azurerm_container_app" "backend" {
 
   ingress {
     external_enabled = true
-    target_port      = 80
+    target_port      = 8000
 
     traffic_weight {
       percentage      = 100
@@ -218,6 +218,12 @@ resource "azurerm_container_app" "backend" {
         secret_name = "gemini-api-key"
       }
     }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
   }
 }
 

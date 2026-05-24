@@ -208,6 +208,12 @@ postgres_server_fqdn
 
 Estos valores sirven para configurar GitHub Actions, revisar recursos en Azure o conectar el frontend con el backend.
 
+Nota: la URL correcta para que el frontend llame al backend es la URL estable del Container App, no una URL de revision con doble guion. En este proyecto se ve asi:
+
+```text
+https://ca-cloudapp-dev-api.delightfulsea-04be8a68.eastus.azurecontainerapps.io
+```
+
 ## Como Encaja Con El Proyecto
 
 La aplicacion tiene dos piezas principales:

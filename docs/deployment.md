@@ -132,7 +132,13 @@ For the current phase 1 Azure deployment, the non-sensitive values should look l
 AZURE_RESOURCE_GROUP=rg-cloudapp-dev
 AZURE_CONTAINER_APP_NAME=ca-cloudapp-dev-api
 ACR_LOGIN_SERVER=acrcloudappdevzgc5ku.azurecr.io
-VITE_API_BASE_URL=https://ca-cloudapp-dev-api--upevfyl.delightfulsea-04be8a68.eastus.azurecontainerapps.io
+VITE_API_BASE_URL=https://ca-cloudapp-dev-api.delightfulsea-04be8a68.eastus.azurecontainerapps.io
+```
+
+The deployed frontend origin should be configured in Terraform so the backend CORS policy accepts browser requests:
+
+```hcl
+frontend_origin = "https://kind-dune-06cb3ca0f.7.azurestaticapps.net"
 ```
 
 Create `AZURE_STATIC_WEB_APPS_API_TOKEN` from:
@@ -143,8 +149,8 @@ terraform output -raw static_web_app_api_key
 
 Do not paste Terraform state files, `.env`, or `.tfvars` into GitHub. Only paste the individual secret values into GitHub repository secrets.
 
-Update `frontend_origin` in Terraform after Static Web Apps has a public hostname, then run `terraform apply` again so backend CORS accepts the deployed portal.
+Update `frontend_origin` in Terraform after Static Web Apps has a public hostname, then run `terraform apply` again so backend CORS accepts the deployed portal. Use the backend base URL for `VITE_API_BASE_URL`; do not include `/docs` or `/health`.
 
-Terraform creates the Container App with a public placeholder image first. The backend workflow replaces it with the FastAPI image and switches ingress to port `8000`.
+Terraform creates the Container App with a public placeholder image first. The backend workflow replaces it with the FastAPI image. Terraform keeps ingress on port `8000` and ignores later image changes so future `terraform apply` runs do not roll the app back to the placeholder image.
 
 For local development, copy `backend/.env.example` to `backend/.env` and put your real Gemini key in `GEMINI_API_KEY`. Never commit `.env`.
