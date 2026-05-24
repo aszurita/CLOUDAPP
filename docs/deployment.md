@@ -70,6 +70,7 @@ After Terraform finishes, set these GitHub repository secrets:
 
 ```text
 AZURE_CLIENT_ID
+AZURE_CLIENT_SECRET
 AZURE_TENANT_ID
 AZURE_SUBSCRIPTION_ID
 AZURE_RESOURCE_GROUP
@@ -86,13 +87,46 @@ Useful Terraform output commands:
 
 ```bash
 terraform output -raw acr_login_server
-terraform output -raw acr_admin_username
-terraform output -raw acr_admin_password
 terraform output -raw container_app_name
 terraform output -raw resource_group_name
 terraform output -raw static_web_app_api_key
 terraform output -raw container_app_url
 terraform output -raw static_web_app_default_host_name
+```
+
+Get ACR credentials with Azure CLI:
+
+```bash
+ACR_NAME=$(terraform output -raw acr_login_server | cut -d. -f1)
+az acr credential show --name "$ACR_NAME" --query username -o tsv
+az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv
+```
+
+If you want to use the Terraform ACR outputs instead, run `terraform apply` once after pulling the latest code so the state file learns the new output definitions.
+
+Create the Azure service principal used by the backend workflow:
+
+```bash
+az ad sp create-for-rbac \
+  --name cloudapp-github-actions \
+  --role contributor \
+  --scopes /subscriptions/$(az account show --query id -o tsv)/resourceGroups/$(terraform output -raw resource_group_name)
+```
+
+Copy the command output into GitHub repository secrets:
+
+```text
+AZURE_CLIENT_ID=<appId>
+AZURE_CLIENT_SECRET=<password>
+AZURE_TENANT_ID=<tenant>
+AZURE_SUBSCRIPTION_ID=<your subscription id>
+```
+
+Your current subscription values:
+
+```text
+AZURE_SUBSCRIPTION_ID=c38860ad-92d1-45e2-b159-0f2496993231
+AZURE_TENANT_ID=b7af8caf-83d8-4644-85ae-317c545223c1
 ```
 
 For the current phase 1 Azure deployment, the non-sensitive values should look like this:

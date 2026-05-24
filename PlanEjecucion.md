@@ -636,7 +636,7 @@ Para IA, Google publica precios por modelo y tokens, así que puedes controlar e
 
 # Roadmap de implementación
 
-"## Fase 1 — Plataforma base
+## Fase 1 — Plataforma base
 
 Objetivo: tener app real en Azure.
 
@@ -652,7 +652,7 @@ Entregable:
 
 ```text
 Portal funcionando en nube real.
-```"
+```
 
 ---
 
