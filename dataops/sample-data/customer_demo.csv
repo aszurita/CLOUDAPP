@@ -1,0 +1,7 @@
+customer_id,customer_name,segment,country,signup_date,risk_tier
+CUST-0001,Ana Morales,retail,EC,2025-08-12,low
+CUST-0002,Banco Demo SME,sme,EC,2024-11-03,medium
+CUST-0003,Carlos Vera,premium,EC,2026-01-15,low
+CUST-0004,Exportadora Norte,corporate,EC,2023-04-22,high
+CUST-0005,Lucia Andrade,retail,EC,2025-12-09,medium
+CUST-0006,Servicios Sierra,sme,EC,2024-02-17,low

@@ -1,0 +1,10 @@
+transaction_id,customer_id,transaction_date,transaction_amount,channel,status
+TX-0001,CUST-0001,2026-05-01,125.40,mobile,approved
+TX-0002,CUST-0002,2026-05-01,980.00,web,approved
+TX-0003,CUST-0003,2026-05-02,45.20,atm,approved
+TX-0004,CUST-0004,2026-05-02,0.00,branch,rejected
+TX-0005,CUST-9999,2026-05-03,330.10,web,approved
+TX-0006,CUST-0005,,75.00,mobile,approved
+TX-0007,CUST-0006,2026-05-04,210.50,partner,approved
+TX-0008,CUST-0001,2026-05-04,125.40,mobile,approved
+TX-0008,CUST-0001,2026-05-04,125.40,mobile,approved

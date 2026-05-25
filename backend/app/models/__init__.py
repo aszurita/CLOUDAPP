@@ -1,3 +1,10 @@
+from app.models.dataops import (
+    DataOpsGeneratedAsset,
+    DataOpsPipeline,
+    DataOpsPipelineRun,
+    DataOpsQualityCheck,
+    DataOpsQuarantineEvent,
+)
 from app.models.governance import (
     DbaRecommendation,
     DbaTableProfile,
@@ -10,6 +17,11 @@ from app.models.platform import AuditEvent, Deployment, Environment, PlatformSet
 
 __all__ = [
     "AuditEvent",
+    "DataOpsGeneratedAsset",
+    "DataOpsPipeline",
+    "DataOpsPipelineRun",
+    "DataOpsQualityCheck",
+    "DataOpsQuarantineEvent",
     "Deployment",
     "Environment",
     "PlatformSetting",

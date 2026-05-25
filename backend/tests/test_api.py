@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
@@ -15,6 +16,17 @@ def setup_module() -> None:
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolate_openai_env(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "phase-test-placeholder")
+    monkeypatch.setenv("DATABRICKS_HOST", "")
+    monkeypatch.setenv("DATABRICKS_TOKEN", "")
+    monkeypatch.setenv("DATABRICKS_JOB_ID", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def test_health_reports_database_connection() -> None:
@@ -149,3 +161,35 @@ def test_dba_copilot_generates_profiles_and_recommendations(monkeypatch) -> None
     assert body["profiles_count"] >= 1
     assert body["recommendations_count"] >= 1
     assert "OpenAI" in body["ai_summary"]
+
+
+def test_dataops_pipeline_run_persists_demo_metrics() -> None:
+    response = client.post("/api/dataops/pipelines/run", json={"actor": "test-user"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["bronze_rows"] > body["silver_rows"]
+    assert body["silver_rows"] >= body["gold_rows"]
+    assert body["quality_score"] > 99
+    assert body["quarantine_rows"] == 1054
+    assert len(body["generated_tables_json"]) >= 3
+
+
+def test_dataops_monitor_exposes_quality_assets_and_quarantine() -> None:
+    client.post("/api/dataops/pipelines/run", json={"actor": "test-user"})
+
+    current = client.get("/api/dataops/pipelines/current")
+    quality = client.get("/api/dataops/quality/latest")
+    assets = client.get("/api/dataops/assets")
+    quarantine = client.get("/api/dataops/quarantine")
+
+    assert current.status_code == 200
+    assert current.json()["pipeline"]["name"] == "tpcds-retail-dataops"
+    assert current.json()["latest_run"]["status"] == "success"
+    assert quality.status_code == 200
+    assert any(item["status"] == "failed" for item in quality.json())
+    assert assets.status_code == 200
+    assert any(item["layer"] == "gold" for item in assets.json())
+    assert quarantine.status_code == 200
+    assert len(quarantine.json()) >= 1

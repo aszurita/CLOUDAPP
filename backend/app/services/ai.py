@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from openai import OpenAI
+from openai import AuthenticationError, BadRequestError, OpenAI, OpenAIError
 
 from app.core.config import get_settings
 
@@ -36,7 +36,19 @@ class AIRecommendationService:
         }
         if self._supports_temperature():
             params["temperature"] = self.settings.openai_temperature
-        response = client.responses.create(**params)
+        try:
+            response = client.responses.create(**params)
+        except BadRequestError as exc:
+            if "temperature" not in str(exc):
+                raise
+            params.pop("temperature", None)
+            response = client.responses.create(**params)
+        except AuthenticationError as exc:
+            raise AIConfigurationError(
+                "OpenAI rejected OPENAI_API_KEY. Create a new key and update CLOUDAPP/backend/.env."
+            ) from exc
+        except OpenAIError as exc:
+            raise AIConfigurationError(f"OpenAI request failed. Check OPENAI_API_KEY in CLOUDAPP/backend/.env. Detail: {exc}") from exc
         text = getattr(response, "output_text", None)
         if text:
             return text.strip()
@@ -73,5 +85,18 @@ class AIRecommendationService:
             {
                 "table_profiles": profiles,
                 "instruction": "Analiza los perfiles y devuelve el JSON con los hallazgos más importantes.",
+            },
+        )
+
+    def generate_dataops_failure_summary(self, run_summary: dict[str, Any]) -> str:
+        system_prompt = (
+            "Eres un copiloto DataOps. Resume fallas de calidad de un pipeline Bronze/Silver/Gold en español. "
+            "No solicites secretos ni datos crudos. Usa solo la metadata agregada recibida y propone acciones operativas."
+        )
+        return self._complete(
+            system_prompt,
+            {
+                "run_summary": run_summary,
+                "instruction": "Explica el estado, reglas fallidas, impacto en quarantine y acciones siguientes.",
             },
         )

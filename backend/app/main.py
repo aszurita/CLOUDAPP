@@ -1,9 +1,13 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.routes import router
+from app.api.sentinel import sentinel_router
+from app.api.sentinel.metrics import start_auto_collection, stop_auto_collection
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
@@ -11,7 +15,17 @@ from app.db.session import SessionLocal
 configure_logging()
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await start_auto_collection()
+    try:
+        yield
+    finally:
+        await stop_auto_collection()
+
+
+app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,3 +61,4 @@ def health() -> dict[str, str]:
 
 
 app.include_router(router, prefix=settings.api_prefix)
+app.include_router(sentinel_router, prefix=settings.api_prefix)

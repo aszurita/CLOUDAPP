@@ -106,6 +106,72 @@ export type DbaRecommendation = {
   created_at: string;
 };
 
+export type DataOpsPipeline = {
+  id: number;
+  name: string;
+  description: string | null;
+  databricks_job_id: string | null;
+  status: string;
+  updated_at: string;
+};
+
+export type DataOpsPipelineRun = {
+  id: number;
+  pipeline_id: number;
+  run_id: string;
+  status: string;
+  bronze_rows: number;
+  silver_rows: number;
+  gold_rows: number;
+  quality_score: number;
+  quarantine_rows: number;
+  duration_ms: number;
+  failed_rules_json: { rule_code: string; layer: string; failed_rows: number; description: string }[];
+  generated_tables_json: string[];
+  databricks_run_url: string | null;
+  ai_summary: string | null;
+  started_at: string;
+  finished_at: string | null;
+  created_at: string;
+};
+
+export type DataOpsCurrent = {
+  pipeline: DataOpsPipeline;
+  latest_run: DataOpsPipelineRun | null;
+};
+
+export type DataOpsQualityCheck = {
+  id: number;
+  run_id: string;
+  rule_code: string;
+  layer: string;
+  status: string;
+  failed_rows: number;
+  description: string;
+  created_at: string;
+};
+
+export type DataOpsGeneratedAsset = {
+  id: number;
+  run_id: string;
+  layer: string;
+  asset_name: string;
+  row_count: number;
+  storage_path: string | null;
+  created_at: string;
+};
+
+export type DataOpsQuarantineEvent = {
+  id: number;
+  run_id: string;
+  rule_code: string;
+  reason: string;
+  source_file: string | null;
+  record_ref: string | null;
+  preview_json: Record<string, string | number | boolean | null>;
+  created_at: string;
+};
+
 export type Environment = {
   id: number;
   code: string;
@@ -206,4 +272,31 @@ export function getDbaTables() {
 
 export function getDbaRecommendations() {
   return request<DbaRecommendation[]>("/api/dba/recommendations");
+}
+
+export function runDataOpsPipeline() {
+  return request<DataOpsPipelineRun>("/api/dataops/pipelines/run", {
+    method: "POST",
+    body: JSON.stringify({ actor: "demo-user" }),
+  });
+}
+
+export function getDataOpsCurrent() {
+  return request<DataOpsCurrent>("/api/dataops/pipelines/current");
+}
+
+export function getDataOpsHistory() {
+  return request<DataOpsPipelineRun[]>("/api/dataops/pipelines/history");
+}
+
+export function getDataOpsQuality() {
+  return request<DataOpsQualityCheck[]>("/api/dataops/quality/latest");
+}
+
+export function getDataOpsAssets() {
+  return request<DataOpsGeneratedAsset[]>("/api/dataops/assets");
+}
+
+export function getDataOpsQuarantine() {
+  return request<DataOpsQuarantineEvent[]>("/api/dataops/quarantine");
 }

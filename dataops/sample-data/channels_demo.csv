@@ -1,0 +1,5 @@
+channel,description,is_active
+web,Online banking,true
+mobile,Mobile app,true
+branch,Branch office,true
+atm,ATM network,true

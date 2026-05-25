@@ -1,0 +1,24 @@
+{
+  "pipeline_name": "tpcds-retail-dataops",
+  "catalog": "databricks_proyectobg",
+  "schemas": {
+    "bronze": "tpcds_bronze",
+    "silver": "tpcds_silver",
+    "gold": "tpcds_gold"
+  },
+  "source_tables": [
+    "store_sales",
+    "date_dim",
+    "item",
+    "store"
+  ],
+  "quality_rules": [
+    "sold_date_not_null",
+    "item_not_null",
+    "store_not_null",
+    "quantity_positive",
+    "sales_price_non_negative",
+    "referential_integrity_item_store_date",
+    "ticket_item_deduplication"
+  ]
+}

@@ -1,0 +1,30 @@
+version: '3.8'
+
+networks:
+  cloudapp_net:
+    driver: bridge
+
+volumes:
+  cloudapp_pg_data:
+
+services:
+
+  # Base de datos de CLOUDAPP (la aplicación en sí, NO el lab bancario)
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudapp_postgres
+    environment:
+      POSTGRES_USER: cloudapp
+      POSTGRES_PASSWORD: cloudapp_pass
+      POSTGRES_DB: cloudapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - cloudapp_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudapp -d cloudapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudapp_net

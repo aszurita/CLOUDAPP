@@ -126,6 +126,11 @@ button.primary,
   color: #ffffff;
 }
 
+.tab-spin {
+  animation: spin 0.9s linear infinite;
+  color: currentColor;
+}
+
 .button-row button:disabled,
 button.primary:disabled {
   cursor: not-allowed;
@@ -709,12 +714,210 @@ h3 {
   opacity: 0.4;
 }
 
+/* ── DataOps Monitor ──────────────────────────────────── */
+
+.dataops-monitor {
+  display: grid;
+  gap: 20px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.dataops-header-panel,
+.dataops-run-strip {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.dataops-title {
+  align-items: center;
+  display: flex;
+  font-size: 1.25rem !important;
+  gap: 8px;
+}
+
+.dataops-actions {
+  margin-top: 0;
+}
+
+.dataops-metrics {
+  margin-bottom: 0;
+}
+
+.dataops-grid {
+  margin-top: 0;
+}
+
+.dataops-run-strip p {
+  color: #637283;
+  font-size: 0.88rem;
+  margin-top: 6px;
+}
+
+.dataops-run-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.external-link {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd9e2;
+  border-radius: 8px;
+  color: #174d5f;
+  display: inline-flex;
+  font-size: 0.88rem;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.dataops-running-banner {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto 1fr auto;
+  padding: 14px 18px;
+}
+
+.dataops-running-banner strong {
+  color: #7c2d12;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.dataops-running-banner p {
+  color: #9a3412;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.dataops-running-banner .external-link {
+  border-color: #fdba74;
+  color: #9a3412;
+}
+
+.quarantine-row code {
+  background: #f0f5f7;
+  border-radius: 6px;
+  color: #526270;
+  display: block;
+  font: 0.75rem/1.4 "SFMono-Regular", Consolas, monospace;
+  margin-top: 8px;
+  overflow: hidden;
+  padding: 6px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dba-summary-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.dba-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dba-summary-card {
+  background: #f8fbfc;
+  border: 1px solid #d9e6ed;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.dba-summary-card-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.dba-summary-category {
+  color: #526270;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dba-summary-card h3 {
+  color: #1f2f3d;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.dba-summary-card p {
+  color: #4c6070;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.dba-summary-actions {
+  border-top: 1px solid #e3edf2;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 12px 0 0;
+}
+
+.dba-summary-actions li {
+  align-items: flex-start;
+  color: #334657;
+  display: flex;
+  font-size: 0.86rem;
+  gap: 8px;
+  line-height: 1.45;
+}
+
+.dba-summary-actions svg {
+  color: #16745f;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 /* Severity badge color variants */
 .sev-critical { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
 .sev-high     { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
 .sev-medium   { background: #fffbeb; border-color: #fde68a; color: #b45309; }
 .sev-low      { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 .sev-info     { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
+
+.layer-bronze {
+  background: #f7efe7;
+  border-color: #d9b997;
+  color: #8a4f1d;
+}
+
+.layer-silver {
+  background: #eef3f6;
+  border-color: #b9c8d2;
+  color: #415563;
+}
+
+.layer-gold {
+  background: #eef5ec;
+  border-color: #adc7a4;
+  color: #3f6b3f;
+}
 
 @media (max-width: 900px) {
   .dba-category-grid {
@@ -724,6 +927,25 @@ h3 {
   .dba-header-panel {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .dba-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dataops-header-panel,
+  .dataops-run-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dataops-running-banner {
+    align-items: flex-start;
+    grid-template-columns: auto 1fr;
+  }
+
+  .dataops-running-banner .external-link {
+    grid-column: 1 / -1;
   }
 }
 

@@ -1,0 +1,4 @@
+event_id,customer_id,event_date,event_type,severity
+EV-0001,CUST-0004,2026-05-02,manual_review,high
+EV-0002,CUST-0002,2026-05-03,velocity_alert,medium
+EV-0003,CUST-0005,2026-05-05,profile_change,low

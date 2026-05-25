@@ -9,7 +9,28 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import engine, get_db
-from app.models import AuditEvent, DbaRecommendation, DbaTableProfile, Deployment, Environment, QueryPolicy, QueryReview, Service
+from app.models import (
+    AuditEvent,
+    DataOpsGeneratedAsset,
+    DataOpsPipelineRun,
+    DataOpsQualityCheck,
+    DataOpsQuarantineEvent,
+    DbaRecommendation,
+    DbaTableProfile,
+    Deployment,
+    Environment,
+    QueryPolicy,
+    QueryReview,
+    Service,
+)
+from app.schemas.dataops import (
+    DataOpsCurrentResponse,
+    DataOpsGeneratedAssetRead,
+    DataOpsPipelineRunRead,
+    DataOpsQualityCheckRead,
+    DataOpsQuarantineEventRead,
+    DataOpsRunRequest,
+)
 from app.schemas.governance import (
     DbaAnalyzeResponse,
     DbaRecommendationRead,
@@ -25,6 +46,7 @@ from app.schemas.governance import (
 from app.schemas.platform import DeploymentRead, EnvironmentRead, PlatformStatus, ServiceRead
 from app.services.ai import AIConfigurationError, AIRecommendationService
 from app.services.audit import record_audit_event
+from app.services.dataops import DataOpsMonitorService
 from app.services.dba import DbaCopilotService
 from app.services.query_governance import QueryGovernanceEngine
 
@@ -196,6 +218,75 @@ def dba_tables(db: Session = Depends(get_db)) -> list[DbaTableProfile]:
 @router.get("/dba/recommendations", response_model=list[DbaRecommendationRead])
 def dba_recommendations(db: Session = Depends(get_db)) -> list[DbaRecommendation]:
     return db.query(DbaRecommendation).order_by(DbaRecommendation.created_at.desc()).limit(30).all()
+
+
+@router.post("/dataops/pipelines/run", response_model=DataOpsPipelineRunRead)
+def run_dataops_pipeline(payload: DataOpsRunRequest, db: Session = Depends(get_db)) -> DataOpsPipelineRun:
+    service = DataOpsMonitorService()
+    record_audit_event(
+        db,
+        "dataops.pipeline_started",
+        "DataOps pipeline execution was requested.",
+        actor=payload.actor,
+        metadata={"pipeline": "tpcds-retail-dataops"},
+    )
+    run = service.run_pipeline(db)
+    record_audit_event(
+        db,
+        f"dataops.pipeline_{run.status}",
+        f"DataOps pipeline finished with status {run.status}.",
+        actor=payload.actor,
+        severity="warning" if run.status == "failed" else "info",
+        metadata={"run_id": run.run_id, "quality_score": run.quality_score, "quarantine_rows": run.quarantine_rows},
+    )
+    return run
+
+
+@router.get("/dataops/pipelines/current", response_model=DataOpsCurrentResponse)
+def current_dataops_pipeline(db: Session = Depends(get_db)) -> DataOpsCurrentResponse:
+    service = DataOpsMonitorService()
+    pipeline = service.ensure_pipeline(db)
+    service.sync_running_runs(db, pipeline)
+    latest = service.latest_run(db)
+    return DataOpsCurrentResponse(pipeline=pipeline, latest_run=latest)
+
+
+@router.get("/dataops/pipelines/history", response_model=list[DataOpsPipelineRunRead])
+def dataops_pipeline_history(db: Session = Depends(get_db)) -> list[DataOpsPipelineRun]:
+    DataOpsMonitorService().sync_running_runs(db)
+    return db.query(DataOpsPipelineRun).order_by(DataOpsPipelineRun.created_at.desc()).limit(20).all()
+
+
+@router.get("/dataops/pipelines/{run_id}", response_model=DataOpsPipelineRunRead)
+def get_dataops_pipeline_run(run_id: str, db: Session = Depends(get_db)) -> DataOpsPipelineRun:
+    service = DataOpsMonitorService()
+    service.sync_running_runs(db)
+    run = db.query(DataOpsPipelineRun).filter(DataOpsPipelineRun.run_id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="DataOps pipeline run not found.")
+    service._ensure_run_url(run)
+    db.commit()
+    return run
+
+
+@router.get("/dataops/quality/latest", response_model=list[DataOpsQualityCheckRead])
+def latest_dataops_quality(db: Session = Depends(get_db)) -> list[DataOpsQualityCheck]:
+    latest = DataOpsMonitorService().latest_run(db)
+    if not latest:
+        return []
+    return db.query(DataOpsQualityCheck).filter(DataOpsQualityCheck.run_id == latest.run_id).order_by(DataOpsQualityCheck.id).all()
+
+
+@router.get("/dataops/quarantine", response_model=list[DataOpsQuarantineEventRead])
+def dataops_quarantine(db: Session = Depends(get_db)) -> list[DataOpsQuarantineEvent]:
+    DataOpsMonitorService().sync_running_runs(db)
+    return db.query(DataOpsQuarantineEvent).order_by(DataOpsQuarantineEvent.created_at.desc()).limit(30).all()
+
+
+@router.get("/dataops/assets", response_model=list[DataOpsGeneratedAssetRead])
+def dataops_assets(db: Session = Depends(get_db)) -> list[DataOpsGeneratedAsset]:
+    DataOpsMonitorService().sync_running_runs(db)
+    return db.query(DataOpsGeneratedAsset).order_by(DataOpsGeneratedAsset.created_at.desc()).limit(50).all()
 
 
 def _query_ai_explanation(sql: str, evaluation: dict[str, Any]) -> str:

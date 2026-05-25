@@ -3,13 +3,14 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models import DemoCustomer, DemoCustomerTransaction, Deployment, Environment, PlatformSetting, QueryPolicy, Service
+from app.models import DataOpsPipeline, DemoCustomer, DemoCustomerTransaction, Deployment, Environment, PlatformSetting, QueryPolicy, Service
 from app.services.audit import record_audit_event
 
 
 def seed_demo_data(db: Session) -> None:
     seed_platform_data(db)
     seed_phase2_data(db)
+    seed_phase3_data(db)
 
 
 def seed_platform_data(db: Session) -> None:
@@ -133,3 +134,21 @@ def seed_phase2_data(db: Session) -> None:
 
     db.commit()
     record_audit_event(db, "phase2.seeded", "Query Governance and DBA Copilot demo data initialized.")
+
+
+def seed_phase3_data(db: Session) -> None:
+    if db.query(DataOpsPipeline).filter(DataOpsPipeline.name == "tpcds-retail-dataops").first():
+        return
+    db.add(
+        DataOpsPipeline(
+            name="tpcds-retail-dataops",
+            description="TPC-DS retail DataOps pipeline for Bronze, Silver, Gold and quarantine metrics.",
+            status="idle",
+        )
+    )
+    setting = db.query(PlatformSetting).filter(PlatformSetting.key == "databricks_enabled").first()
+    if setting:
+        setting.value = "demo"
+        setting.description = "Phase 3 DataOps Monitor is enabled in demo mode until Databricks secrets are configured."
+    db.commit()
+    record_audit_event(db, "phase3.seeded", "DataOps Monitor demo pipeline initialized.")

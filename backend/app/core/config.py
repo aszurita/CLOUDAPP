@@ -20,7 +20,25 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str | None = None
     databricks_host: str | None = None
+    databricks_token: str | None = None
+    databricks_job_id: str | None = None
+    databricks_catalog: str = "databricks_proyectobg"
+    databricks_schema_bronze: str = "tpcds_bronze"
+    databricks_schema_silver: str = "tpcds_silver"
+    databricks_schema_gold: str = "tpcds_gold"
     datahub_server: str | None = None
+
+    # ── DB Sentinel AI ────────────────────────────────────────────────────────
+    sentinel_monitor_db_url: str | None = None
+    sentinel_model_path: str = "./artifacts/incident_predictor.pkl"
+    sentinel_rca_model_path: str = "./artifacts/root_cause_model.pkl"
+    sentinel_feature_schema_path: str = "./artifacts/feature_schema.json"
+    sentinel_openai_api_key: str | None = None
+    sentinel_llm_model: str = "gpt-4o-mini"
+    sentinel_collect_interval_seconds: int = 60
+    sentinel_prediction_horizon_minutes: int = 10
+    sentinel_risk_threshold: float = 0.70
+    sentinel_enable_auto_collect: bool = False
 
     @property
     def ai_configured(self) -> bool:
