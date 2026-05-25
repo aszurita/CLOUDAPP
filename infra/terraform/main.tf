@@ -120,6 +120,13 @@ resource "azurerm_key_vault_secret" "openai_placeholder" {
 
 resource "azurerm_key_vault_secret" "databricks_placeholder" {
   name         = "DATABRICKS-HOST"
+  value        = var.databricks_host != "" ? var.databricks_host : "phase-3-placeholder"
+  key_vault_id = azurerm_key_vault.main.id
+  depends_on   = [azurerm_key_vault_access_policy.deployer]
+}
+
+resource "azurerm_key_vault_secret" "databricks_token_placeholder" {
+  name         = "DATABRICKS-TOKEN"
   value        = "phase-3-placeholder"
   key_vault_id = azurerm_key_vault.main.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
@@ -169,6 +176,11 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "openai-api-key"
     value = azurerm_key_vault_secret.openai_placeholder.value
+  }
+
+  secret {
+    name  = "databricks-token"
+    value = azurerm_key_vault_secret.databricks_token_placeholder.value
   }
 
   secret {
@@ -250,6 +262,61 @@ resource "azurerm_container_app" "backend" {
       env {
         name        = "OPENAI_API_KEY"
         secret_name = "openai-api-key"
+      }
+
+      env {
+        name  = "DATABRICKS_HOST"
+        value = var.databricks_host
+      }
+
+      env {
+        name        = "DATABRICKS_TOKEN"
+        secret_name = "databricks-token"
+      }
+
+      env {
+        name  = "DATABRICKS_JOB_ID"
+        value = var.databricks_job_id
+      }
+
+      env {
+        name  = "DATABRICKS_CATALOG"
+        value = var.databricks_catalog
+      }
+
+      env {
+        name  = "DATABRICKS_SCHEMA_BRONZE"
+        value = var.databricks_schema_bronze
+      }
+
+      env {
+        name  = "DATABRICKS_SCHEMA_SILVER"
+        value = var.databricks_schema_silver
+      }
+
+      env {
+        name  = "DATABRICKS_SCHEMA_GOLD"
+        value = var.databricks_schema_gold
+      }
+
+      env {
+        name  = "DATAOPS_PIPELINES_JSON"
+        value = var.dataops_pipelines_json
+      }
+
+      env {
+        name  = "SENTINEL_MODEL_PATH"
+        value = "./artifacts/incident_predictor.pkl"
+      }
+
+      env {
+        name  = "SENTINEL_RCA_MODEL_PATH"
+        value = "./artifacts/root_cause_model.pkl"
+      }
+
+      env {
+        name  = "SENTINEL_FEATURE_SCHEMA_PATH"
+        value = "./artifacts/feature_schema.json"
       }
 
       env {

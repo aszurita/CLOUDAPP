@@ -19,6 +19,7 @@
 | `DATABRICKS_SCHEMA_BRONZE` | no | Bronze schema name, default `tpcds_bronze`. |
 | `DATABRICKS_SCHEMA_SILVER` | no | Silver schema name, default `tpcds_silver`. |
 | `DATABRICKS_SCHEMA_GOLD` | no | Gold schema name, default `tpcds_gold`. |
+| `DATAOPS_PIPELINES_JSON` | no | JSON list/object with additional DataOps pipelines. Each item can define `pipeline_key`, `name`, `pipeline_type`, `description`, `databricks_job_id`, `summary_task_key`, `summary_task_keywords`, and `notebook_params`. |
 | `CATALOG_PROVIDER` | no | Catalog mode for phase 4: `internal`, `datahub`, or `purview`. Default `internal`. |
 | `DATAHUB_ENABLED` | no | Set to `true` to publish catalog metadata to DataHub. |
 | `DATAHUB_SERVER` | no | DataHub server URL. If empty, the portal uses the internal PostgreSQL catalog fallback. |

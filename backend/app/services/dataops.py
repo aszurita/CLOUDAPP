@@ -60,12 +60,12 @@ class DataOpsMonitorService:
             definition_description = str(definition["description"])
             if not pipeline.description or _should_refresh_pipeline_description(pipeline.description):
                 pipeline.description = definition_description
-            pipeline.config_json = {**definition["config"], **current_config}
+            pipeline.config_json = {**current_config, **definition["config"]}
 
             desired_job_id = definition.get("databricks_job_id")
             if pipeline_key == DEFAULT_PIPELINE_KEY and self.settings.databricks_job_id:
                 desired_job_id = self.settings.databricks_job_id
-            if desired_job_id and (pipeline_key == BANKING_ALERTS_PIPELINE_KEY or not pipeline.databricks_job_id):
+            if desired_job_id:
                 pipeline.databricks_job_id = str(desired_job_id)
             pipelines.append(pipeline)
         db.commit()
@@ -188,7 +188,7 @@ class DataOpsMonitorService:
 
     def _pipeline_definitions(self) -> dict[str, dict]:
         catalog = self.settings.databricks_catalog
-        return {
+        definitions = {
             DEFAULT_PIPELINE_KEY: {
                 "name": "tpcds-retail-dataops",
                 "pipeline_type": RETAIL_PIPELINE_TYPE,
@@ -225,6 +225,49 @@ class DataOpsMonitorService:
                 },
             },
         }
+        definitions.update(self._configured_pipeline_definitions())
+        return definitions
+
+    def _configured_pipeline_definitions(self) -> dict[str, dict]:
+        raw = self.settings.dataops_pipelines_json
+        if not raw:
+            return {}
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+
+        items = list(parsed.values()) if isinstance(parsed, dict) else parsed
+        if not isinstance(items, list | tuple):
+            return {}
+
+        definitions: dict[str, dict] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            pipeline_key = str(item.get("pipeline_key") or item.get("key") or "").strip()
+            if not pipeline_key:
+                continue
+            pipeline_type = str(item.get("pipeline_type") or item.get("type") or RETAIL_PIPELINE_TYPE)
+            notebook_params = item.get("notebook_params") if isinstance(item.get("notebook_params"), dict) else {}
+            summary_keywords = item.get("summary_task_keywords")
+            config = {
+                "label": str(item.get("label") or item.get("name") or pipeline_key),
+                "summary_task_keywords": summary_keywords if isinstance(summary_keywords, list) else ["summary"],
+                "notebook_params": notebook_params,
+            }
+            if item.get("summary_task_key"):
+                config["summary_task_key"] = str(item["summary_task_key"])
+            if isinstance(item.get("tables"), dict):
+                config["tables"] = item["tables"]
+            definitions[pipeline_key] = {
+                "name": str(item.get("name") or pipeline_key),
+                "pipeline_type": pipeline_type,
+                "description": str(item.get("description") or f"Databricks job configured for {pipeline_key}."),
+                "databricks_job_id": str(item.get("databricks_job_id") or item.get("job_id") or "").strip() or None,
+                "config": config,
+            }
+        return definitions
 
     def _databricks_configured(self, pipeline: DataOpsPipeline) -> bool:
         return bool(self.settings.databricks_host and self.settings.databricks_token and pipeline.databricks_job_id)
@@ -737,7 +780,7 @@ class DataOpsMonitorService:
     def _local_demo_url(self, pipeline: DataOpsPipeline) -> str:
         if pipeline.pipeline_type == BANKING_ALERTS_PIPELINE_TYPE:
             return "local-demo://databricks/alertas-movimientos-inusuales"
-        return "local-demo://databricks/tpcds-retail-dataops"
+        return f"local-demo://databricks/{pipeline.pipeline_key or DEFAULT_PIPELINE_KEY}"
 
     def _is_local_demo_run(self, run: DataOpsPipelineRun) -> bool:
         return run.run_id.startswith(("demo-", "bank-demo-")) or bool(

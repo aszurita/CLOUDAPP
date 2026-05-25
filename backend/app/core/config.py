@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     databricks_schema_bronze: str = "tpcds_bronze"
     databricks_schema_silver: str = "tpcds_silver"
     databricks_schema_gold: str = "tpcds_gold"
+    dataops_pipelines_json: str | None = None
     datahub_server: str | None = None
     datahub_token: str | None = None
     datahub_enabled: bool = False

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
+import json
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
@@ -233,6 +234,34 @@ def test_dataops_monitor_supports_banking_alerts_pipeline() -> None:
     assert any(item["layer"] == "audit" for item in assets.json())
     assert quarantine.status_code == 200
     assert quarantine.json() == []
+
+
+def test_dataops_monitor_supports_configured_databricks_jobs(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "DATAOPS_PIPELINES_JSON",
+        json.dumps(
+            [
+                {
+                    "pipeline_key": "riesgo-clientes-gold",
+                    "name": "JOB_RIESGO_CLIENTES_GOLD",
+                    "pipeline_type": "lakehouse_bronze_silver_gold",
+                    "description": "Job configurable para score de riesgo de clientes.",
+                    "databricks_job_id": "123456789",
+                    "summary_task_key": "emit_run_summary",
+                    "notebook_params": {"catalog": "databricks_proyectobg", "gold_schema": "risk_gold"},
+                }
+            ]
+        ),
+    )
+    get_settings.cache_clear()
+
+    response = client.get("/api/dataops/pipelines")
+
+    assert response.status_code == 200
+    pipelines = {item["pipeline_key"]: item for item in response.json()}
+    assert "riesgo-clientes-gold" in pipelines
+    assert pipelines["riesgo-clientes-gold"]["databricks_job_id"] == "123456789"
+    assert pipelines["riesgo-clientes-gold"]["config_json"]["summary_task_key"] == "emit_run_summary"
 
 
 def test_catalog_sync_creates_assets_columns_and_lineage() -> None:

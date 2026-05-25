@@ -88,6 +88,48 @@ variable "datahub_enabled" {
   default     = false
 }
 
+variable "databricks_host" {
+  type        = string
+  description = "Optional Azure Databricks workspace URL used by DataOps Monitor."
+  default     = ""
+}
+
+variable "databricks_job_id" {
+  type        = string
+  description = "Optional Azure Databricks Workflow job ID launched by DataOps Monitor."
+  default     = ""
+}
+
+variable "databricks_catalog" {
+  type        = string
+  description = "Databricks Unity Catalog/catalog name for DataOps assets."
+  default     = "databricks_proyectobg"
+}
+
+variable "databricks_schema_bronze" {
+  type        = string
+  description = "Databricks Bronze schema name."
+  default     = "tpcds_bronze"
+}
+
+variable "databricks_schema_silver" {
+  type        = string
+  description = "Databricks Silver schema name."
+  default     = "tpcds_silver"
+}
+
+variable "databricks_schema_gold" {
+  type        = string
+  description = "Databricks Gold schema name."
+  default     = "tpcds_gold"
+}
+
+variable "dataops_pipelines_json" {
+  type        = string
+  description = "Optional JSON list/object with additional DataOps pipelines and Databricks job IDs."
+  default     = ""
+}
+
 variable "purview_endpoint" {
   type        = string
   description = "Optional Microsoft Purview endpoint for enterprise catalog mode."
