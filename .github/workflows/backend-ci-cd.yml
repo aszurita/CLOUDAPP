@@ -56,9 +56,9 @@ jobs:
           test -n "$ACR_PASSWORD" || (echo "Missing GitHub secret: ACR_PASSWORD" && exit 1)
           test -n "$OPENAI_API_KEY" || (echo "Missing GitHub secret: OPENAI_API_KEY" && exit 1)
           python -m json.tool <<< "$AZURE_CREDENTIALS" > /dev/null || (echo "AZURE_CREDENTIALS is not valid JSON" && exit 1)
-          if { test -n "$DATABRICKS_HOST" || test -n "$DATABRICKS_TOKEN" || test -n "$DATABRICKS_JOB_ID"; } && \
-             { test -z "$DATABRICKS_HOST" || test -z "$DATABRICKS_TOKEN" || test -z "$DATABRICKS_JOB_ID"; }; then
-            echo "DATABRICKS_HOST, DATABRICKS_TOKEN and DATABRICKS_JOB_ID must be configured together."
+          if { test -n "$DATABRICKS_HOST" || test -n "$DATABRICKS_TOKEN"; } && \
+             { test -z "$DATABRICKS_HOST" || test -z "$DATABRICKS_TOKEN"; }; then
+            echo "DATABRICKS_HOST and DATABRICKS_TOKEN must be configured together."
             exit 1
           fi
           if [ -n "$DATAOPS_PIPELINES_JSON" ]; then
