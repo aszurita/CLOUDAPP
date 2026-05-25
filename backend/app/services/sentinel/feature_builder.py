@@ -127,7 +127,7 @@ class FeatureBuilder:
                 """
                 SELECT MAX(collected_at)
                 FROM sentinel_metric_samples
-                WHERE (:database_name IS NULL OR database_name = :database_name)
+                WHERE (CAST(:database_name AS TEXT) IS NULL OR database_name = CAST(:database_name AS TEXT))
                 """
             ),
             {"database_name": database_name},
@@ -150,7 +150,7 @@ class FeatureBuilder:
                 FROM sentinel_metric_samples
                 WHERE collected_at > :since
                   AND collected_at <= :latest
-                  AND (:database_name IS NULL OR database_name = :database_name)
+                  AND (CAST(:database_name AS TEXT) IS NULL OR database_name = CAST(:database_name AS TEXT))
                 ORDER BY collected_at ASC
                 """
             ),
