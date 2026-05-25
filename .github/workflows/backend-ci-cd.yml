@@ -102,7 +102,10 @@ jobs:
             --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --image "${{ secrets.ACR_LOGIN_SERVER }}/cloudapp-backend:${{ github.sha }}" \
-            --set-env-vars OPENAI_API_KEY=secretref:openai-api-key
+            --set-env-vars \
+              AI_PROVIDER=openai \
+              OPENAI_MODEL=chat-latest \
+              OPENAI_API_KEY=secretref:openai-api-key
           if [ -n "$DATABRICKS_HOST" ]; then
             az containerapp update \
               --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
