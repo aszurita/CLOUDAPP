@@ -8,12 +8,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.paths import find_workspace_root
 from app.schemas.sentinel_schemas import FaultJobResponse, SimulateFaultRequest
 
 router = APIRouter()
 
-PROJECT_ROOT = Path(__file__).resolve().parents[5]
-IA_BASES_ROOT = PROJECT_ROOT / "IA_BASES"
+IA_BASES_ROOT = find_workspace_root(Path(__file__)) / "IA_BASES"
 
 FAULT_CATALOG: dict[str, dict[str, Any]] = {
     "lock_wait_storm": {

@@ -14,6 +14,8 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 
+from app.core.paths import find_backend_root, find_workspace_root
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,8 +56,12 @@ class IncidentPredictorService:
         candidate = Path(model_path)
         if candidate.exists():
             return candidate
-        project_root = Path(__file__).resolve().parents[5]
-        ia_bases_model = project_root / "IA_BASES" / "artifacts" / candidate.name
+
+        backend_model = find_backend_root(Path(__file__)) / "artifacts" / candidate.name
+        if backend_model.exists():
+            return backend_model
+
+        ia_bases_model = find_workspace_root(Path(__file__)) / "IA_BASES" / "artifacts" / candidate.name
         if ia_bases_model.exists():
             return ia_bases_model
         return candidate
