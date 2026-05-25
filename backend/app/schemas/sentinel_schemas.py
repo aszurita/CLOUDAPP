@@ -1,9 +1,11 @@
 from datetime import datetime
-from typing import Any, Optional
-from pydantic import BaseModel
+from typing import Any, Literal, Optional
+from pydantic import BaseModel, ConfigDict
 
 
 class LiveMetricsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     collected_at: Optional[datetime] = None
     engine: Optional[str] = None
     database_name: Optional[str] = None
@@ -19,11 +21,10 @@ class LiveMetricsResponse(BaseModel):
     replication_lag_seconds: Optional[float] = None
     message: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-
 
 class IncidentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     detected_at: datetime
     engine: Optional[str] = None
@@ -36,9 +37,6 @@ class IncidentResponse(BaseModel):
     resolved_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 class IncidentDetailResponse(IncidentResponse):
     root_cause_top3: Optional[list] = None
@@ -46,6 +44,30 @@ class IncidentDetailResponse(IncidentResponse):
     llm_explanation: Optional[str] = None
     llm_recommended_actions: Optional[list] = None
     dba_action_taken: Optional[str] = None
+
+
+class IncidentListResponse(BaseModel):
+    incidents: list[IncidentResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class IncidentEvidenceResponse(BaseModel):
+    incident_id: int
+    incident_type: Optional[str] = None
+    risk_score: Optional[float] = None
+    root_cause_top1: Optional[str] = None
+    root_cause_top3: Optional[list] = None
+    llm_explanation: Optional[str] = None
+    llm_recommended_actions: Optional[list] = None
+    metrics_timeline: list[dict[str, Any]]
+    slow_queries: list[dict[str, Any]]
+
+
+class ResolveIncidentRequest(BaseModel):
+    resolved_by: str = "dba"
+    action_taken: str = ""
 
 
 class PredictRequest(BaseModel):
@@ -73,9 +95,71 @@ class PredictResponse(BaseModel):
 class ExplainRequest(BaseModel):
     incident_id: Optional[int] = None
     use_current_metrics: bool = True
+    engine: str = "postgresql"
+    database_name: str = "core_banking_sim"
     window_minutes: int = 10
+    horizon_minutes: int = 10
+    use_llm: bool = False
+    persist_incident: bool = False
+
+
+class CopilotEvidenceItem(BaseModel):
+    signal: str
+    importance: str
+
+
+class CopilotAction(BaseModel):
+    order: int
+    action: str
+    sql: Optional[str] = None
+    requires_approval: bool
+    urgency: str
+
+
+class CopilotResponse(BaseModel):
+    incident_summary: str
+    impact_description: str
+    severity_classification: str
+    affected_operations: list[str]
+    top3_causes: list[dict[str, Any]]
+    evidence_signals: list[CopilotEvidenceItem]
+    recommended_actions: list[CopilotAction]
+    diagnostic_sqls: list[dict[str, Any]]
+    escalation_needed: bool
+    escalation_reason: Optional[str] = None
+    generated_at: str
+    model_used: str
+    tokens_used: Optional[int] = None
+    safety_mode: str
+    incident_id: Optional[int] = None
 
 
 class SimulateFaultRequest(BaseModel):
+    fault_type: Optional[
+        Literal[
+            "lock_wait_storm",
+            "deadlock",
+            "concurrent_commits",
+            "missing_index",
+            "heavy_workload",
+            "vacuum_problem",
+            "io_saturation",
+            "replication_lag",
+        ]
+    ] = None
     duration_seconds: int = 60
-    intensity: str = "medium"
+    intensity: Literal["low", "medium", "high"] = "medium"
+    dry_run: bool = True
+    approved_by: Optional[str] = None
+
+
+class FaultJobResponse(BaseModel):
+    job_id: str
+    fault_type: str
+    status: str
+    dry_run: bool
+    duration_seconds: int
+    intensity: str
+    started_at: str
+    plan: list[str]
+    command: Optional[str] = None

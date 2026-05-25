@@ -69,3 +69,33 @@ variable "frontend_origin" {
   description = "Frontend origin allowed by backend CORS. Replace after Static Web Apps creates its public URL."
   default     = "http://localhost:5173"
 }
+
+variable "catalog_provider" {
+  type        = string
+  description = "Catalog provider for phase 4. Valid values: internal, datahub, purview."
+  default     = "internal"
+}
+
+variable "datahub_server" {
+  type        = string
+  description = "Optional DataHub server URL for phase 4 catalog sync."
+  default     = ""
+}
+
+variable "datahub_enabled" {
+  type        = bool
+  description = "Enable DataHub publishing for phase 4."
+  default     = false
+}
+
+variable "purview_endpoint" {
+  type        = string
+  description = "Optional Microsoft Purview endpoint for enterprise catalog mode."
+  default     = ""
+}
+
+variable "purview_enabled" {
+  type        = bool
+  description = "Enable Purview integration placeholders for phase 4."
+  default     = false
+}

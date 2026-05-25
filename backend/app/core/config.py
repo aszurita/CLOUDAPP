@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     databricks_schema_silver: str = "tpcds_silver"
     databricks_schema_gold: str = "tpcds_gold"
     datahub_server: str | None = None
+    datahub_token: str | None = None
+    datahub_enabled: bool = False
+    catalog_provider: str = "internal"
+    purview_account_name: str | None = None
+    purview_endpoint: str | None = None
+    purview_tenant_id: str | None = None
+    purview_client_id: str | None = None
+    purview_client_secret: str | None = None
+    purview_enabled: bool = False
 
     # ── DB Sentinel AI ────────────────────────────────────────────────────────
     sentinel_monitor_db_url: str | None = None

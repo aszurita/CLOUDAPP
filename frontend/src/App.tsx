@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookOpen,
   Boxes,
   CheckCircle2,
   ChevronDown,
@@ -8,22 +9,40 @@ import {
   Database,
   ExternalLink,
   GitBranch,
+  Mail,
+  Network,
   Play,
+  RefreshCw,
   SearchCheck,
   Server,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Tags,
   TriangleAlert,
+  UserRound,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { SentinelDashboard } from "./pages/sentinel/SentinelDashboard";
 import {
   ApiError,
+  AutopilotReport,
+  AutopilotTask,
+  CatalogAsset,
+  CatalogClassification,
+  CatalogColumn,
+  CatalogLineageEdge,
+  CatalogStatus,
+  CatalogSyncRun,
   DataOpsGeneratedAsset,
+  DataOpsMetric,
+  DataOpsPipeline,
   DataOpsPipelineRun,
   DataOpsQualityCheck,
   DataOpsQuarantineEvent,
+  DataOpsRunEvent,
   DbaAnalyzeResponse,
   DbaRecommendation,
   DbaTableProfile,
@@ -37,11 +56,21 @@ import {
   Service,
   analyzeQuery,
   executeQuery,
+  generateCatalogDocumentation,
+  getAutopilotHistory,
+  getAutopilotLatest,
+  getCatalogAssets,
+  getCatalogClassifications,
+  getCatalogColumns,
+  getCatalogLineage,
+  getCatalogStatus,
+  getCatalogSyncRuns,
   getDbaRecommendations,
   getDbaTables,
   getDataOpsAssets,
   getDataOpsCurrent,
   getDataOpsHistory,
+  getDataOpsPipelines,
   getDataOpsQuality,
   getDataOpsQuarantine,
   getDemoQueries,
@@ -51,21 +80,31 @@ import {
   getQueryHistory,
   getQueryPolicies,
   getServices,
+  runAutopilotAnalysis,
   runDataOpsPipeline,
   runDbaAnalysis,
+  syncCatalog,
+  updateAutopilotTaskStatus,
+  updateCatalogColumnDescription,
+  updateCatalogClassification,
+  updateCatalogOwner,
 } from "./api";
 
 type LoadState = "loading" | "ready" | "error";
-type View = "overview" | "query" | "dba" | "dataops";
+type View = "overview" | "query" | "dba" | "dataops" | "catalog" | "autopilot" | "sentinel";
 
 function statusTone(status: string) {
   if (status === "bronze") return "layer-bronze";
   if (status === "silver") return "layer-silver";
   if (status === "gold") return "layer-gold";
+  if (status === "source") return "layer-source";
+  if (status === "audit") return "layer-audit";
+  if (status === "alert") return "layer-alert";
+  if (status === "operational") return "layer-operational";
   if (["healthy", "success", "connected", "approved", "low", "configured", "passed"].includes(status)) {
     return "text-emerald-700 bg-emerald-50 border-emerald-200";
   }
-  if (["attention", "degraded", "medium", "warning", "running"].includes(status)) return "text-amber-700 bg-amber-50 border-amber-200";
+  if (["attention", "degraded", "medium", "warning", "running", "high"].includes(status)) return "text-amber-700 bg-amber-50 border-amber-200";
   return "text-rose-700 bg-rose-50 border-rose-200";
 }
 
@@ -106,6 +145,10 @@ function getErrorMessage(error: unknown) {
     }
   }
   return "Platform request failed.";
+}
+
+function formatQualityScore(value: number) {
+  return Number.isInteger(value) ? `${value}` : `${value}`;
 }
 
 export default function App() {
@@ -195,6 +238,17 @@ export default function App() {
           {dataOpsRunningRun && <Activity className="tab-spin" size={15} aria-hidden="true" />}
           DataOps Monitor
         </button>
+        <button className={activeView === "catalog" ? "active" : ""} onClick={() => setActiveView("catalog")}>
+          Catalog Governance
+        </button>
+        <button className={activeView === "autopilot" ? "active" : ""} onClick={() => setActiveView("autopilot")}>
+          <Zap size={15} aria-hidden="true" />
+          Autopilot Analysis
+        </button>
+        <button className={activeView === "sentinel" ? "active" : ""} onClick={() => setActiveView("sentinel")}>
+          <ShieldAlert size={15} aria-hidden="true" />
+          DB Sentinel AI
+        </button>
       </nav>
 
       {activeView === "overview" && (
@@ -203,6 +257,9 @@ export default function App() {
       {activeView === "query" && <QueryGovernance />}
       {activeView === "dba" && <DbaCopilot />}
       {activeView === "dataops" && <DataOpsMonitor onRunStatusChange={setDataOpsRunningRun} />}
+      {activeView === "catalog" && <CatalogGovernance />}
+      {activeView === "autopilot" && <AutopilotCenter />}
+      {activeView === "sentinel" && <SentinelDashboard />}
     </main>
   );
 }
@@ -302,6 +359,218 @@ function Overview({
         </div>
       </section>
     </>
+  );
+}
+
+function reportMetric(report: AutopilotReport | null, key: string, fallback: string | number = 0) {
+  const value = report?.metrics_json?.[key];
+  if (typeof value === "number" || typeof value === "string") return value;
+  return fallback;
+}
+
+function priorityTone(priority: string) {
+  if (priority === "p0" || priority === "p1") return "high";
+  if (priority === "p2") return "medium";
+  return "low";
+}
+
+function AutopilotCenter() {
+  const [report, setReport] = useState<AutopilotReport | null>(null);
+  const [history, setHistory] = useState<AutopilotReport[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refreshAutopilot() {
+    const [latest, reportHistory] = await Promise.all([getAutopilotLatest(), getAutopilotHistory()]);
+    setReport(latest.latest_report);
+    setHistory(reportHistory);
+  }
+
+  useEffect(() => {
+    refreshAutopilot().catch((requestError) => setError(getErrorMessage(requestError)));
+  }, []);
+
+  async function runAnalysis() {
+    setBusy(true);
+    setError(null);
+    try {
+      const nextReport = await runAutopilotAnalysis();
+      setReport(nextReport);
+      setHistory(await getAutopilotHistory());
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setTaskStatus(task: AutopilotTask, status: string) {
+    setError(null);
+    try {
+      await updateAutopilotTaskStatus(task.id, status);
+      await refreshAutopilot();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    }
+  }
+
+  const openTasks = report?.tasks.filter((task) => task.status !== "done" && task.status !== "dismissed") ?? [];
+  const highFindings = report?.findings_json.filter((finding) => ["critical", "high"].includes(finding.severity)) ?? [];
+
+  return (
+    <div className="autopilot-center">
+      <div className="panel autopilot-hero">
+        <div>
+          <p className="eyebrow">Fase 5 · Intelligent Autopilot</p>
+          <h2 className="autopilot-title">
+            <Zap size={22} aria-hidden="true" />
+            Run Autopilot Analysis
+          </h2>
+          <p>
+            Analiza plataforma, consultas, DBA, DataOps y catálogo para producir riesgos, tareas y plan de remediación.
+          </p>
+        </div>
+        <div className="button-row autopilot-actions">
+          <button onClick={() => void refreshAutopilot()} disabled={busy}>
+            <RefreshCw size={16} aria-hidden="true" />
+            Refresh
+          </button>
+          <button className="primary" onClick={() => void runAnalysis()} disabled={busy}>
+            <Play size={16} aria-hidden="true" />
+            Run Analysis
+          </button>
+        </div>
+      </div>
+
+      <ErrorNotice error={error} />
+
+      <section className="metrics-grid autopilot-metrics">
+        <Stat label="Autopilot score" value={report ? `${report.overall_score}/100` : "0/100"} icon={ShieldCheck} />
+        <Stat label="Risk level" value={report?.risk_level ?? "pending"} icon={TriangleAlert} />
+        <Stat label="Findings" value={reportMetric(report, "findings_total")} icon={SearchCheck} />
+        <Stat label="Open tasks" value={openTasks.length} icon={CheckCircle2} />
+        <Stat label="Sensitive columns" value={reportMetric(report, "sensitive_columns")} icon={Tags} />
+      </section>
+
+      {!report && !busy && (
+        <div className="panel dba-empty">
+          <Zap size={34} aria-hidden="true" />
+          <p>Ejecuta Autopilot para generar el primer reporte ejecutivo.</p>
+        </div>
+      )}
+
+      {report && (
+        <section className="content-grid autopilot-grid">
+          <div className="panel wide autopilot-summary">
+            <div>
+              <p className="eyebrow">Latest Report</p>
+              <h2>{report.summary}</h2>
+              <p>{new Date(report.created_at).toLocaleString()} · {report.run_id}</p>
+            </div>
+            <StatusBadge value={report.risk_level} />
+          </div>
+
+          {report.ai_summary && (
+            <div className="panel wide">
+              <div className="panel-heading">
+                <h2>Executive AI Brief</h2>
+                <Sparkles size={18} aria-hidden="true" />
+              </div>
+              <AiMarkdown text={report.ai_summary} />
+            </div>
+          )}
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Priority Findings</h2>
+              <span>{highFindings.length} high</span>
+            </div>
+            <div className="row-list compact">
+              {report.findings_json.map((finding) => (
+                <div className="data-row autopilot-finding" key={`${finding.category}-${finding.title}`}>
+                  <div>
+                    <strong>{finding.title}</strong>
+                    <p>{finding.category} · {finding.description}</p>
+                    {finding.actions && finding.actions.length > 0 && (
+                      <small>{finding.actions.slice(0, 2).join(" · ")}</small>
+                    )}
+                  </div>
+                  <StatusBadge value={finding.severity} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Remediation Tasks</h2>
+              <span>{openTasks.length} open</span>
+            </div>
+            <div className="row-list compact">
+              {report.tasks.map((task) => (
+                <div className="data-row autopilot-task" key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <p>{task.owner} · {task.category} · {task.due_hint ?? "backlog"}</p>
+                    <small>{task.action_json.actions?.slice(0, 2).join(" · ")}</small>
+                    <div className="button-row task-actions">
+                      {task.status === "open" && (
+                        <button onClick={() => void setTaskStatus(task, "in_progress")}>Start</button>
+                      )}
+                      {task.status !== "done" && (
+                        <button onClick={() => void setTaskStatus(task, "done")}>Done</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="task-badges">
+                    <StatusBadge value={priorityTone(task.priority)} />
+                    <StatusBadge value={task.status} />
+                  </div>
+                </div>
+              ))}
+              {report.tasks.length === 0 && <p className="catalog-muted">Sin tareas pendientes.</p>}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Infrastructure Suggestions</h2>
+              <Cog size={18} aria-hidden="true" />
+            </div>
+            <div className="row-list compact">
+              {report.infra_suggestions_json.map((item) => (
+                <div className="data-row" key={`${item.area}-${item.title}`}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.area} · {item.suggestion}</p>
+                    <small>{item.impact}</small>
+                  </div>
+                  <StatusBadge value="medium" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>History</h2>
+              <span>{history.length}</span>
+            </div>
+            <div className="row-list compact">
+              {history.map((item) => (
+                <div className="data-row" key={item.id}>
+                  <div>
+                    <strong>{item.overall_score}/100 · {item.risk_level}</strong>
+                    <p>{item.findings_json.length} findings · {new Date(item.created_at).toLocaleString()}</p>
+                  </div>
+                  <StatusBadge value={item.risk_level} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -765,7 +1034,96 @@ function DbaSummaryFindings({ findings }: { findings: DbaAiFinding[] }) {
   );
 }
 
+type DataOpsMetricCard = {
+  key: string;
+  label: string;
+  value: string | number;
+  icon: typeof Activity;
+};
+
+function dataOpsPipelineKey(pipeline: DataOpsPipeline | null | undefined) {
+  return pipeline?.pipeline_key || pipeline?.name || "tpcds-retail-dataops";
+}
+
+function metricValue(metric: DataOpsMetric) {
+  if (metric.formatted) return metric.formatted;
+  if (metric.value === null || metric.value === undefined) return "0";
+  const rawValue = typeof metric.value === "boolean" ? (metric.value ? "yes" : "no") : `${metric.value}`;
+  return metric.unit ? `${rawValue}${metric.unit}` : rawValue;
+}
+
+function metricLabel(metric: DataOpsMetric) {
+  if (metric.label === "Generated transactions") return "Source transactions";
+  return metric.label.replace("Generated", "Monitored");
+}
+
+function metricIcon(metric: DataOpsMetric): typeof Activity {
+  const key = metric.key.toLowerCase();
+  if (key.includes("email")) return Mail;
+  if (key.includes("alert") || key.includes("quarantine")) return TriangleAlert;
+  if (key.includes("quality") || key.includes("rate")) return ShieldCheck;
+  if (key.includes("gold")) return Sparkles;
+  if (key.includes("processed") || key.includes("silver")) return CheckCircle2;
+  return Database;
+}
+
+function buildDataOpsMetricCards(run: DataOpsPipelineRun | null): DataOpsMetricCard[] {
+  if (run?.metrics_json?.length) {
+    return [...run.metrics_json]
+      .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+      .slice(0, 5)
+      .map((metric) => ({
+        key: metric.key,
+        label: metricLabel(metric),
+        value: metricValue(metric),
+        icon: metricIcon(metric),
+      }));
+  }
+  return [
+    { key: "bronze_rows", label: "Bronze rows", value: run?.bronze_rows ?? 0, icon: Database },
+    { key: "silver_rows", label: "Silver rows", value: run?.silver_rows ?? 0, icon: CheckCircle2 },
+    { key: "gold_rows", label: "Gold rows", value: run?.gold_rows ?? 0, icon: Sparkles },
+    { key: "quality_score", label: "Quality score", value: run ? `${formatQualityScore(run.quality_score)}%` : "0%", icon: ShieldCheck },
+    { key: "quarantine_rows", label: "Quarantine", value: run?.quarantine_rows ?? 0, icon: TriangleAlert },
+  ];
+}
+
+function findRunMetric(run: DataOpsPipelineRun, key: string) {
+  return run.metrics_json?.find((metric) => metric.key === key);
+}
+
+function dataOpsRunSummary(run: DataOpsPipelineRun, pipeline: DataOpsPipeline | null) {
+  if (pipeline?.pipeline_type === "banking_fraud_alerts") {
+    const alerts = findRunMetric(run, "alerts_generated");
+    const processed = findRunMetric(run, "transactions_processed");
+    return `${alerts ? metricValue(alerts) : run.gold_rows} alertas · ${processed ? metricValue(processed) : run.silver_rows} procesadas`;
+  }
+  return `${formatQualityScore(run.quality_score)}% · ${run.quarantine_rows} quarantine`;
+}
+
+function isLocalDataOpsRun(run: DataOpsPipelineRun | null) {
+  if (!run) return false;
+  return run.databricks_run_url?.startsWith("local-demo://") || run.run_id.includes("demo-");
+}
+
+function realDatabricksUrl(run: DataOpsPipelineRun | null) {
+  if (!run?.databricks_run_url || isLocalDataOpsRun(run)) return null;
+  return run.databricks_run_url;
+}
+
+function dataOpsAssetDisplayName(asset: DataOpsGeneratedAsset, pipeline: DataOpsPipeline | null) {
+  if (pipeline?.pipeline_type !== "banking_fraud_alerts") return asset.asset_name;
+  const labels: Record<string, string> = {
+    transacciones_demo: "transacciones_origen",
+    alertas_movimientos_inusuales: "alertas_movimientos_inusuales",
+    log_ejecucion_alertas: "log_ejecucion_alertas",
+  };
+  return labels[asset.asset_name] ?? asset.asset_name;
+}
+
 function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOpsPipelineRun | null) => void }) {
+  const [pipelines, setPipelines] = useState<DataOpsPipeline[]>([]);
+  const [selectedPipelineKey, setSelectedPipelineKey] = useState("");
   const [currentRun, setCurrentRun] = useState<DataOpsPipelineRun | null>(null);
   const [history, setHistory] = useState<DataOpsPipelineRun[]>([]);
   const [quality, setQuality] = useState<DataOpsQualityCheck[]>([]);
@@ -774,14 +1132,19 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  async function refresh(targetPipelineKey?: string) {
+    const pipelineList = await getDataOpsPipelines();
+    const fallbackKey = dataOpsPipelineKey(pipelineList[0]);
+    const resolvedKey = targetPipelineKey || selectedPipelineKey || fallbackKey;
     const [current, runHistory, qualityChecks, generatedAssets, quarantineEvents] = await Promise.all([
-      getDataOpsCurrent(),
-      getDataOpsHistory(),
-      getDataOpsQuality(),
-      getDataOpsAssets(),
-      getDataOpsQuarantine(),
+      getDataOpsCurrent(resolvedKey),
+      getDataOpsHistory(resolvedKey),
+      getDataOpsQuality(resolvedKey),
+      getDataOpsAssets(resolvedKey),
+      getDataOpsQuarantine(resolvedKey),
     ]);
+    setPipelines(pipelineList);
+    setSelectedPipelineKey(resolvedKey);
     setCurrentRun(current.latest_run);
     onRunStatusChange(current.latest_run?.status === "running" ? current.latest_run : null);
     setHistory(runHistory);
@@ -797,19 +1160,20 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
   useEffect(() => {
     if (currentRun?.status !== "running") return;
     const id = window.setInterval(() => {
-      refresh().catch((requestError) => setError(getErrorMessage(requestError)));
+      refresh(selectedPipelineKey).catch((requestError) => setError(getErrorMessage(requestError)));
     }, 5000);
     return () => window.clearInterval(id);
-  }, [currentRun?.status]);
+  }, [currentRun?.status, selectedPipelineKey]);
 
   async function runPipeline() {
+    const pipelineKey = selectedPipelineKey || dataOpsPipelineKey(pipelines[0]);
     setBusy(true);
     setError(null);
     try {
-      const run = await runDataOpsPipeline();
+      const run = await runDataOpsPipeline(pipelineKey);
       setCurrentRun(run);
       onRunStatusChange(run.status === "running" ? run : null);
-      await refresh();
+      await refresh(pipelineKey);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -817,24 +1181,70 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
     }
   }
 
+  async function changePipeline(pipelineKey: string) {
+    setSelectedPipelineKey(pipelineKey);
+    setBusy(true);
+    setError(null);
+    try {
+      await refresh(pipelineKey);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const selectedPipeline = pipelines.find((pipeline) => dataOpsPipelineKey(pipeline) === selectedPipelineKey) ?? pipelines[0] ?? null;
   const failedChecks = quality.filter((item) => item.status !== "passed");
+  const metricCards = buildDataOpsMetricCards(currentRun);
+  const runEvents = currentRun?.events_json ?? [];
+  const currentRunLabel = currentRun?.business_run_id || currentRun?.run_id;
+  const isBankingPipeline = selectedPipeline?.pipeline_type === "banking_fraud_alerts";
+  const tableCountLabel = isBankingPipeline ? "tablas monitoreadas" : "tablas generadas";
+  const assetsTitle = isBankingPipeline ? "Monitored Tables" : "Generated Assets";
+  const emptyAssetsText = isBankingPipeline ? "Sin tablas monitoreadas todavia." : "Sin assets generados todavia.";
+  const databricksUrl = realDatabricksUrl(currentRun);
+  const showDatabricksRunId = Boolean(
+    currentRun?.databricks_run_id && currentRun.databricks_run_id !== currentRunLabel && !isLocalDataOpsRun(currentRun)
+  );
 
   return (
     <div className="dataops-monitor">
       <div className="panel dataops-header-panel">
-        <div>
-          <p className="eyebrow">Bronze · Silver · Gold</p>
+        <div className="dataops-header-copy">
+          <p className="eyebrow">{isBankingPipeline ? "Alertas bancarias · Gold" : "Bronze · Silver · Gold"}</p>
           <h2 className="dataops-title">
             <Database size={20} aria-hidden="true" />
             DataOps Monitor
           </h2>
+          {selectedPipeline?.description && <p className="dataops-subtitle">{selectedPipeline.description}</p>}
         </div>
-        <div className="button-row dataops-actions">
-          <button onClick={() => void refresh()}>Refresh</button>
-          <button className="primary" onClick={() => void runPipeline()} disabled={busy}>
-            <Play size={16} aria-hidden="true" />
-            Run Pipeline
-          </button>
+        <div className="dataops-toolbar">
+          <label className="dataops-selector" htmlFor="dataops-pipeline">
+            <span>Pipeline</span>
+            <select
+              id="dataops-pipeline"
+              value={selectedPipelineKey}
+              onChange={(event) => void changePipeline(event.target.value)}
+              disabled={busy || pipelines.length === 0}
+            >
+              {pipelines.map((pipeline) => (
+                <option key={pipeline.id} value={dataOpsPipelineKey(pipeline)}>
+                  {pipeline.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="button-row dataops-actions">
+            <button onClick={() => void refresh(selectedPipelineKey)} disabled={busy}>
+              <RefreshCw size={16} aria-hidden="true" />
+              Refresh
+            </button>
+            <button className="primary" onClick={() => void runPipeline()} disabled={busy || !selectedPipeline}>
+              <Play size={16} aria-hidden="true" />
+              Run Pipeline
+            </button>
+          </div>
         </div>
       </div>
 
@@ -845,10 +1255,10 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
           <Activity className="spin" size={18} aria-hidden="true" />
           <div>
             <strong>Job de Databricks en ejecución</strong>
-            <p>Run ID {currentRun.run_id}. El monitor se actualiza automáticamente mientras termina el pipeline.</p>
+            <p>Run ID {currentRunLabel}. El monitor se actualiza automáticamente mientras termina el pipeline.</p>
           </div>
-          {currentRun.databricks_run_url && (
-            <a className="external-link" href={currentRun.databricks_run_url} target="_blank" rel="noreferrer">
+          {databricksUrl && (
+            <a className="external-link" href={databricksUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={16} aria-hidden="true" />
               Ver Run
             </a>
@@ -857,11 +1267,9 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
       )}
 
       <section className="metrics-grid dataops-metrics">
-        <Stat label="Bronze rows" value={currentRun?.bronze_rows ?? 0} icon={Database} />
-        <Stat label="Silver rows" value={currentRun?.silver_rows ?? 0} icon={CheckCircle2} />
-        <Stat label="Gold rows" value={currentRun?.gold_rows ?? 0} icon={Sparkles} />
-        <Stat label="Quality score" value={currentRun ? `${currentRun.quality_score.toFixed(1)}%` : "0%"} icon={ShieldCheck} />
-        <Stat label="Quarantine" value={currentRun?.quarantine_rows ?? 0} icon={TriangleAlert} />
+        {metricCards.map((metric) => (
+          <Stat key={metric.key} label={metric.label} value={metric.value} icon={metric.icon} />
+        ))}
       </section>
 
       {currentRun && (
@@ -869,13 +1277,16 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
           <div className="panel wide dataops-run-strip">
             <div>
               <p className="eyebrow">Current Run</p>
-              <h2>{currentRun.run_id}</h2>
-              <p>{currentRun.duration_ms} ms · {currentRun.generated_tables_json.length} tablas generadas</p>
+              <h2>{currentRunLabel}</h2>
+              <p>
+                {currentRun.duration_ms} ms · {currentRun.generated_tables_json.length} {tableCountLabel}
+                {showDatabricksRunId ? ` · Databricks ${currentRun.databricks_run_id}` : ""}
+              </p>
             </div>
             <div className="dataops-run-actions">
               <StatusBadge value={currentRun.status} />
-              {currentRun.databricks_run_url && (
-                <a className="external-link" href={currentRun.databricks_run_url} target="_blank" rel="noreferrer">
+              {databricksUrl && (
+                <a className="external-link" href={databricksUrl} target="_blank" rel="noreferrer">
                   <ExternalLink size={16} aria-hidden="true" />
                   Databricks
                 </a>
@@ -899,6 +1310,7 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
               <span>{failedChecks.length} failed</span>
             </div>
             <div className="row-list compact">
+              {quality.length === 0 && <p className="catalog-muted">Sin reglas registradas para esta corrida.</p>}
               {quality.map((item) => (
                 <div className="data-row" key={item.id}>
                   <div>
@@ -913,14 +1325,15 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
 
           <div className="panel">
             <div className="panel-heading">
-              <h2>Generated Assets</h2>
+              <h2>{assetsTitle}</h2>
               <span>{assets.length}</span>
             </div>
             <div className="row-list compact">
+              {assets.length === 0 && <p className="catalog-muted">{emptyAssetsText}</p>}
               {assets.map((asset) => (
                 <div className="data-row" key={asset.id}>
                   <div>
-                    <strong>{asset.asset_name}</strong>
+                    <strong>{dataOpsAssetDisplayName(asset, selectedPipeline)}</strong>
                     <p>{asset.layer} · {asset.row_count} filas</p>
                   </div>
                   <StatusBadge value={asset.layer} />
@@ -931,11 +1344,17 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
 
           <div className="panel">
             <div className="panel-heading">
-              <h2>Quarantine Preview</h2>
-              <span>{quarantine.length}</span>
+              <h2>{runEvents.length ? "Detected Alerts" : "Quarantine Preview"}</h2>
+              <span>{runEvents.length || quarantine.length}</span>
             </div>
             <div className="row-list compact">
-              {quarantine.map((event) => (
+              {runEvents.length === 0 && quarantine.length === 0 && (
+                <p className="catalog-muted">Sin eventos para mostrar en esta corrida.</p>
+              )}
+              {runEvents.map((event, index) => (
+                <DataOpsEventRow event={event} key={`${event.record_ref ?? event.rule_code ?? "event"}-${index}`} />
+              ))}
+              {runEvents.length === 0 && quarantine.map((event) => (
                 <div className="data-row quarantine-row" key={event.id}>
                   <div>
                     <strong>{event.record_ref ?? event.rule_code}</strong>
@@ -954,11 +1373,12 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
               <span>{history.length}</span>
             </div>
             <div className="row-list compact">
+              {history.length === 0 && <p className="catalog-muted">Sin historial para este pipeline.</p>}
               {history.map((run) => (
                 <div className="data-row" key={run.id}>
                   <div>
-                    <strong>{run.run_id}</strong>
-                    <p>{run.quality_score.toFixed(1)}% · {run.quarantine_rows} quarantine · {new Date(run.created_at).toLocaleString()}</p>
+                    <strong>{run.business_run_id || run.run_id}</strong>
+                    <p>{dataOpsRunSummary(run, selectedPipeline)} · {new Date(run.created_at).toLocaleString()}</p>
                   </div>
                   <StatusBadge value={run.status} />
                 </div>
@@ -971,11 +1391,401 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
       {!currentRun && !busy && (
         <div className="panel dba-empty">
           <Database size={32} aria-hidden="true" />
-          <p>Ejecuta el pipeline para ver métricas DataOps.</p>
+          <p>Ejecuta el pipeline seleccionado para ver métricas DataOps.</p>
         </div>
       )}
     </div>
   );
+}
+
+function DataOpsEventRow({ event }: { event: DataOpsRunEvent }) {
+  const preview = event.preview ?? event.preview_json ?? {};
+  const badge = event.severity || event.rule_code || "alert";
+  return (
+    <div className="data-row quarantine-row">
+      <div>
+        <strong>{event.record_ref ?? event.rule_code ?? event.event_type ?? "alert"}</strong>
+        <p>{event.reason ?? "Movimiento inusual detectado."}</p>
+        <code>{JSON.stringify(preview)}</code>
+      </div>
+      <StatusBadge value={badge} />
+    </div>
+  );
+}
+
+function CatalogGovernance() {
+  const [status, setStatus] = useState<CatalogStatus | null>(null);
+  const [assets, setAssets] = useState<CatalogAsset[]>([]);
+  const [columns, setColumns] = useState<CatalogColumn[]>([]);
+  const [classifications, setClassifications] = useState<CatalogClassification[]>([]);
+  const [lineage, setLineage] = useState<CatalogLineageEdge[]>([]);
+  const [syncRuns, setSyncRuns] = useState<CatalogSyncRun[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
+  const [layerFilter, setLayerFilter] = useState("all");
+  const [classificationFilter, setClassificationFilter] = useState("all");
+  const [ownerDraft, setOwnerDraft] = useState("");
+  const [columnDrafts, setColumnDrafts] = useState<Record<number, string>>({});
+  const [savingColumnId, setSavingColumnId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refreshCatalog(nextSelectedId?: number | null) {
+    const [catalogStatus, catalogAssets, catalogClassifications, catalogLineage, catalogSyncRuns] = await Promise.all([
+      getCatalogStatus(),
+      getCatalogAssets(),
+      getCatalogClassifications(),
+      getCatalogLineage(),
+      getCatalogSyncRuns(),
+    ]);
+    const normalizedAssets = [...catalogAssets].sort((a, b) => {
+      const layerOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, operational: 3 };
+      return (layerOrder[a.layer] ?? 9) - (layerOrder[b.layer] ?? 9) || a.asset_name.localeCompare(b.asset_name);
+    });
+    setStatus(catalogStatus);
+    setAssets(normalizedAssets);
+    setClassifications(catalogClassifications);
+    setLineage(catalogLineage);
+    setSyncRuns(catalogSyncRuns);
+    const fallbackId = normalizedAssets[0]?.id ?? null;
+    const selectedId = nextSelectedId === undefined ? selectedAssetId ?? fallbackId : nextSelectedId;
+    setSelectedAssetId(selectedId);
+  }
+
+  useEffect(() => {
+    refreshCatalog().catch((requestError) => setError(getErrorMessage(requestError)));
+  }, []);
+
+  const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? null;
+
+  useEffect(() => {
+    if (!selectedAsset) {
+      setColumns([]);
+      setOwnerDraft("");
+      return;
+    }
+    setOwnerDraft(selectedAsset.owner);
+    getCatalogColumns(selectedAsset.id)
+      .then((items) => {
+        setColumns(items);
+        setColumnDrafts(Object.fromEntries(items.map((column) => [column.id, column.description ?? ""])));
+      })
+      .catch((requestError) => setError(getErrorMessage(requestError)));
+  }, [selectedAsset?.id]);
+
+  async function runSync() {
+    setBusy(true);
+    setError(null);
+    try {
+      await syncCatalog();
+      await refreshCatalog();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function documentAsset() {
+    if (!selectedAsset) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await generateCatalogDocumentation(selectedAsset.id);
+      await refreshCatalog(response.asset.id);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveOwner() {
+    if (!selectedAsset) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateCatalogOwner(selectedAsset.id, ownerDraft);
+      await refreshCatalog(updated.id);
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveClassification(classification: string) {
+    if (!selectedAsset) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateCatalogClassification(selectedAsset.id, classification);
+      await refreshCatalog(updated.id);
+      const refreshedColumns = await getCatalogColumns(updated.id);
+      setColumns(refreshedColumns);
+      setColumnDrafts(Object.fromEntries(refreshedColumns.map((column) => [column.id, column.description ?? ""])));
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveColumnDescription(column: CatalogColumn) {
+    const description = columnDrafts[column.id] ?? "";
+    setSavingColumnId(column.id);
+    setError(null);
+    try {
+      const updated = await updateCatalogColumnDescription(column.id, description);
+      setColumns((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setColumnDrafts((current) => ({ ...current, [updated.id]: updated.description ?? "" }));
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setSavingColumnId(null);
+    }
+  }
+
+  const layerOptions = useMemo(() => ["all", ...Array.from(new Set(assets.map((asset) => asset.layer)))], [assets]);
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      const layerMatch = layerFilter === "all" || asset.layer === layerFilter;
+      const classMatch = classificationFilter === "all" || asset.sensitivity_level === classificationFilter;
+      return layerMatch && classMatch;
+    });
+  }, [assets, layerFilter, classificationFilter]);
+
+  const sensitiveColumns = columns.filter((column) => column.is_sensitive);
+  const inbound = selectedAsset ? lineage.filter((edge) => edge.target_asset_urn === selectedAsset.asset_urn) : [];
+  const outbound = selectedAsset ? lineage.filter((edge) => edge.source_asset_urn === selectedAsset.asset_urn) : [];
+
+  return (
+    <div className="catalog-governance">
+      <div className="panel catalog-header-panel">
+        <div>
+          <p className="eyebrow">DataHub · Purview · Internal Catalog</p>
+          <h2 className="catalog-title">
+            <BookOpen size={20} aria-hidden="true" />
+            Catalog Governance
+          </h2>
+        </div>
+        <div className="button-row catalog-actions">
+          <button onClick={() => void refreshCatalog()}>Refresh</button>
+          <button className="primary" onClick={() => void runSync()} disabled={busy}>
+            <RefreshCw size={16} aria-hidden="true" />
+            Sync Catalog
+          </button>
+        </div>
+      </div>
+
+      <ErrorNotice error={error} />
+
+      <section className="metrics-grid catalog-metrics">
+        <Stat label="Assets" value={status?.assets_total ?? assets.length} icon={Database} />
+        <Stat label="Documented" value={status?.documented_assets ?? 0} icon={BookOpen} />
+        <Stat label="Sensitive cols" value={status?.sensitive_columns ?? 0} icon={ShieldCheck} />
+        <Stat label="Lineage edges" value={status?.lineage_edges ?? lineage.length} icon={Network} />
+        <Stat label="Provider" value={status?.external_catalog ?? "not_configured"} icon={Tags} />
+      </section>
+
+      <section className="catalog-ops-layout">
+        <aside className="panel catalog-sidebar">
+          <div className="panel-heading">
+            <h2>Assets</h2>
+            <span>{filteredAssets.length}</span>
+          </div>
+          <div className="catalog-filters">
+            <select value={layerFilter} onChange={(event) => setLayerFilter(event.target.value)}>
+              {layerOptions.map((layer) => (
+                <option key={layer} value={layer}>{layer === "all" ? "All layers" : layer}</option>
+              ))}
+            </select>
+            <select value={classificationFilter} onChange={(event) => setClassificationFilter(event.target.value)}>
+              <option value="all">All classes</option>
+              {classifications.map((item) => (
+                <option key={item.code} value={item.code}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="row-list compact catalog-asset-list">
+            {filteredAssets.map((asset) => (
+              <button
+                className={`catalog-asset-button${selectedAsset?.id === asset.id ? " active" : ""}`}
+                key={asset.id}
+                onClick={() => setSelectedAssetId(asset.id)}
+              >
+                <span>
+                  <strong>{asset.asset_name}</strong>
+                  <small>{asset.platform} · {asset.owner}</small>
+                </span>
+                <StatusBadge value={asset.layer} />
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="catalog-main">
+          {selectedAsset ? (
+            <>
+              <div className="panel catalog-detail-panel">
+                <div className="catalog-detail-head">
+                  <div>
+                    <p className="eyebrow">{selectedAsset.source_system} · {domainLabel(selectedAsset.domain)}</p>
+                    <h2>{selectedAsset.display_name}</h2>
+                    <p>{selectedAsset.database_name}.{selectedAsset.schema_name}.{selectedAsset.table_name}</p>
+                  </div>
+                  <div className="catalog-detail-actions">
+                    <StatusBadge value={selectedAsset.sensitivity_level} />
+                    <StatusBadge value={selectedAsset.documentation_status} />
+                    {selectedAsset.external_url && (
+                      <a className="external-link" href={selectedAsset.external_url} target="_blank" rel="noreferrer">
+                        <ExternalLink size={16} aria-hidden="true" />
+                        Source
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="catalog-controls">
+                  <div className="catalog-class-field">
+                    <ShieldCheck size={16} aria-hidden="true" />
+                    <select
+                      value={selectedAsset.sensitivity_level}
+                      onChange={(event) => void saveClassification(event.target.value)}
+                      disabled={busy}
+                    >
+                      {classifications.map((item) => (
+                        <option key={item.code} value={item.code}>{item.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="primary" onClick={() => void documentAsset()} disabled={busy}>
+                    <Sparkles size={16} aria-hidden="true" />
+                    Generate Documentation
+                  </button>
+                </div>
+
+                {selectedAsset.description ? (
+                  <div className="catalog-doc">
+                    <AiMarkdown text={selectedAsset.description} />
+                  </div>
+                ) : (
+                  <div className="catalog-doc empty-doc">
+                    <BookOpen size={24} aria-hidden="true" />
+                    <p>Documentation pending.</p>
+                  </div>
+                )}
+              </div>
+
+            </>
+          ) : (
+            <div className="panel dba-empty">
+              <BookOpen size={32} aria-hidden="true" />
+              <p>Sync the catalog to load governed assets.</p>
+            </div>
+          )}
+        </div>
+
+        <aside className="catalog-side-stack">
+          <div className="panel catalog-sync-panel">
+            <div className="panel-heading">
+              <h2>Sync Runs</h2>
+              <span>{syncRuns.length}</span>
+            </div>
+            <div className="row-list compact">
+              {syncRuns.map((run) => (
+                <div className="data-row" key={run.id}>
+                  <div>
+                    <strong>{run.source}</strong>
+                    <p>{run.assets_seen} seen · {run.assets_created} new · {new Date(run.started_at).toLocaleString()}</p>
+                  </div>
+                  <StatusBadge value={run.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {selectedAsset && (
+            <div className="panel catalog-lineage-panel">
+              <div className="panel-heading">
+                <h2>Lineage</h2>
+                <Network size={18} aria-hidden="true" />
+              </div>
+              <div className="catalog-lineage-list">
+                {[...inbound, ...outbound].map((edge) => (
+                  <div className="catalog-lineage-edge" key={edge.id}>
+                    <GitBranch size={16} aria-hidden="true" />
+                    <div>
+                      <strong>{edge.transformation_name ?? edge.lineage_type}</strong>
+                      <p>{shortUrn(edge.source_asset_urn)} -&gt; {shortUrn(edge.target_asset_urn)}</p>
+                    </div>
+                  </div>
+                ))}
+                {inbound.length + outbound.length === 0 && <p className="catalog-muted">No lineage edges for this asset.</p>}
+              </div>
+            </div>
+          )}
+        </aside>
+      </section>
+
+      {selectedAsset && (
+        <section className="catalog-metadata-section">
+          <div className="panel catalog-dictionary-panel">
+            <div className="panel-heading">
+              <h2>Metadata Dictionary</h2>
+              <span>{columns.length} fields · {sensitiveColumns.length} sensitive</span>
+            </div>
+            <div className="catalog-dictionary-table">
+              <div className="catalog-dictionary-row catalog-dictionary-head">
+                <span>Field</span>
+                <span>Type</span>
+                <span>Structure</span>
+                <span>Classification</span>
+                <span>Description</span>
+                <span>Action</span>
+              </div>
+              {columns.map((column) => {
+                const draft = columnDrafts[column.id] ?? "";
+                const unchanged = draft.trim() === (column.description ?? "").trim();
+                return (
+                  <div className="catalog-dictionary-row" key={column.id}>
+                    <div className="field-name">
+                      <strong>{column.column_name}</strong>
+                      <small>{column.is_sensitive ? "Sensitive field" : "Business field"}</small>
+                    </div>
+                    <span>{column.data_type}</span>
+                    <span>{column.nullable ? "Nullable" : "Required"}</span>
+                    <StatusBadge value={column.classification} />
+                    <textarea
+                      value={draft}
+                      onChange={(event) => setColumnDrafts((current) => ({ ...current, [column.id]: event.target.value }))}
+                      aria-label={`Description for ${column.column_name}`}
+                    />
+                    <button
+                      className="catalog-save-btn"
+                      onClick={() => void saveColumnDescription(column)}
+                      disabled={savingColumnId === column.id || unchanged}
+                    >
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                      Save
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function shortUrn(urn: string) {
+  const parts = urn.split(",");
+  return parts.length >= 2 ? parts[1] : urn;
+}
+
+function domainLabel(domain: string) {
+  return domain.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function renderInline(text: string): React.ReactNode {

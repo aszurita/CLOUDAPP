@@ -9,3 +9,6 @@ sqlalchemy==2.0.35
 sqlparse==0.5.1
 uvicorn[standard]==0.30.6
 psycopg2
+numpy>=1.26.0
+pandas>=2.1.0
+scikit-learn==1.8.0

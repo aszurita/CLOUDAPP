@@ -11,7 +11,15 @@ from app.core.config import get_settings
 from app.db.session import engine, get_db
 from app.models import (
     AuditEvent,
+    AutopilotReport,
+    AutopilotTask,
+    CatalogAsset,
+    CatalogClassification,
+    CatalogColumn,
+    CatalogLineageEdge,
+    CatalogSyncRun,
     DataOpsGeneratedAsset,
+    DataOpsPipeline,
     DataOpsPipelineRun,
     DataOpsQualityCheck,
     DataOpsQuarantineEvent,
@@ -23,9 +31,30 @@ from app.models import (
     QueryReview,
     Service,
 )
+from app.schemas.autopilot import (
+    AutopilotCurrentResponse,
+    AutopilotReportRead,
+    AutopilotRunRequest,
+    AutopilotTaskRead,
+    AutopilotTaskStatusUpdateRequest,
+)
+from app.schemas.catalog import (
+    CatalogAssetRead,
+    CatalogClassificationRead,
+    CatalogClassificationUpdateRequest,
+    CatalogColumnDescriptionUpdateRequest,
+    CatalogColumnRead,
+    CatalogDocumentResponse,
+    CatalogLineageEdgeRead,
+    CatalogOwnerUpdateRequest,
+    CatalogStatusResponse,
+    CatalogSyncRequest,
+    CatalogSyncRunRead,
+)
 from app.schemas.dataops import (
     DataOpsCurrentResponse,
     DataOpsGeneratedAssetRead,
+    DataOpsPipelineRead,
     DataOpsPipelineRunRead,
     DataOpsQualityCheckRead,
     DataOpsQuarantineEventRead,
@@ -46,7 +75,9 @@ from app.schemas.governance import (
 from app.schemas.platform import DeploymentRead, EnvironmentRead, PlatformStatus, ServiceRead
 from app.services.ai import AIConfigurationError, AIRecommendationService
 from app.services.audit import record_audit_event
-from app.services.dataops import DataOpsMonitorService
+from app.services.autopilot import AutopilotService
+from app.services.catalog import CatalogGovernanceService
+from app.services.dataops import DEFAULT_PIPELINE_KEY, DataOpsMonitorService
 from app.services.dba import DbaCopilotService
 from app.services.query_governance import QueryGovernanceEngine
 
@@ -222,39 +253,98 @@ def dba_recommendations(db: Session = Depends(get_db)) -> list[DbaRecommendation
 
 @router.post("/dataops/pipelines/run", response_model=DataOpsPipelineRunRead)
 def run_dataops_pipeline(payload: DataOpsRunRequest, db: Session = Depends(get_db)) -> DataOpsPipelineRun:
+    return _run_dataops_pipeline_for_key(DEFAULT_PIPELINE_KEY, payload, db)
+
+
+@router.get("/dataops/pipelines", response_model=list[DataOpsPipelineRead])
+def list_dataops_pipelines(db: Session = Depends(get_db)) -> list[DataOpsPipeline]:
+    return DataOpsMonitorService().list_pipelines(db)
+
+
+@router.post("/dataops/pipelines/{pipeline_key}/run", response_model=DataOpsPipelineRunRead)
+def run_named_dataops_pipeline(
+    pipeline_key: str, payload: DataOpsRunRequest, db: Session = Depends(get_db)
+) -> DataOpsPipelineRun:
+    return _run_dataops_pipeline_for_key(pipeline_key, payload, db)
+
+
+def _run_dataops_pipeline_for_key(pipeline_key: str, payload: DataOpsRunRequest, db: Session) -> DataOpsPipelineRun:
     service = DataOpsMonitorService()
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
     record_audit_event(
         db,
         "dataops.pipeline_started",
         "DataOps pipeline execution was requested.",
         actor=payload.actor,
-        metadata={"pipeline": "tpcds-retail-dataops"},
+        metadata={"pipeline": pipeline.pipeline_key or pipeline.name, "databricks_job_id": pipeline.databricks_job_id},
     )
-    run = service.run_pipeline(db)
+    run = service.run_pipeline(db, pipeline.pipeline_key or pipeline.name)
     record_audit_event(
         db,
         f"dataops.pipeline_{run.status}",
         f"DataOps pipeline finished with status {run.status}.",
         actor=payload.actor,
         severity="warning" if run.status == "failed" else "info",
-        metadata={"run_id": run.run_id, "quality_score": run.quality_score, "quarantine_rows": run.quarantine_rows},
+        metadata={
+            "pipeline": pipeline.pipeline_key or pipeline.name,
+            "run_id": run.run_id,
+            "business_run_id": run.business_run_id,
+            "quality_score": run.quality_score,
+            "quarantine_rows": run.quarantine_rows,
+        },
     )
     return run
 
 
 @router.get("/dataops/pipelines/current", response_model=DataOpsCurrentResponse)
 def current_dataops_pipeline(db: Session = Depends(get_db)) -> DataOpsCurrentResponse:
+    return _current_dataops_pipeline_for_key(DEFAULT_PIPELINE_KEY, db)
+
+
+@router.get("/dataops/pipelines/{pipeline_key}/current", response_model=DataOpsCurrentResponse)
+def current_named_dataops_pipeline(pipeline_key: str, db: Session = Depends(get_db)) -> DataOpsCurrentResponse:
+    return _current_dataops_pipeline_for_key(pipeline_key, db)
+
+
+def _current_dataops_pipeline_for_key(pipeline_key: str, db: Session) -> DataOpsCurrentResponse:
     service = DataOpsMonitorService()
-    pipeline = service.ensure_pipeline(db)
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
     service.sync_running_runs(db, pipeline)
-    latest = service.latest_run(db)
+    latest = service.latest_run(db, pipeline.pipeline_key or pipeline.name, sync=False)
     return DataOpsCurrentResponse(pipeline=pipeline, latest_run=latest)
 
 
 @router.get("/dataops/pipelines/history", response_model=list[DataOpsPipelineRunRead])
 def dataops_pipeline_history(db: Session = Depends(get_db)) -> list[DataOpsPipelineRun]:
-    DataOpsMonitorService().sync_running_runs(db)
-    return db.query(DataOpsPipelineRun).order_by(DataOpsPipelineRun.created_at.desc()).limit(20).all()
+    return DataOpsMonitorService().history_runs(db, DEFAULT_PIPELINE_KEY)
+
+
+@router.get("/dataops/pipelines/{pipeline_key}/history", response_model=list[DataOpsPipelineRunRead])
+def named_dataops_pipeline_history(pipeline_key: str, db: Session = Depends(get_db)) -> list[DataOpsPipelineRun]:
+    service = DataOpsMonitorService()
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
+    return service.history_runs(db, pipeline.pipeline_key or pipeline.name)
+
+
+@router.get("/dataops/pipelines/{pipeline_key}/quality/latest", response_model=list[DataOpsQualityCheckRead])
+def latest_named_dataops_quality(pipeline_key: str, db: Session = Depends(get_db)) -> list[DataOpsQualityCheck]:
+    service = DataOpsMonitorService()
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
+    return service.latest_quality_checks(db, pipeline.pipeline_key or pipeline.name)
+
+
+@router.get("/dataops/pipelines/{pipeline_key}/quarantine", response_model=list[DataOpsQuarantineEventRead])
+def named_dataops_quarantine(pipeline_key: str, db: Session = Depends(get_db)) -> list[DataOpsQuarantineEvent]:
+    service = DataOpsMonitorService()
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
+    return service.latest_quarantine_events(db, pipeline.pipeline_key or pipeline.name)
+
+
+@router.get("/dataops/pipelines/{pipeline_key}/assets", response_model=list[DataOpsGeneratedAssetRead])
+def named_dataops_assets(pipeline_key: str, db: Session = Depends(get_db)) -> list[DataOpsGeneratedAsset]:
+    service = DataOpsMonitorService()
+    pipeline = _dataops_pipeline_or_404(service, db, pipeline_key)
+    return service.latest_assets(db, pipeline.pipeline_key or pipeline.name)
 
 
 @router.get("/dataops/pipelines/{run_id}", response_model=DataOpsPipelineRunRead)
@@ -271,22 +361,209 @@ def get_dataops_pipeline_run(run_id: str, db: Session = Depends(get_db)) -> Data
 
 @router.get("/dataops/quality/latest", response_model=list[DataOpsQualityCheckRead])
 def latest_dataops_quality(db: Session = Depends(get_db)) -> list[DataOpsQualityCheck]:
-    latest = DataOpsMonitorService().latest_run(db)
-    if not latest:
-        return []
-    return db.query(DataOpsQualityCheck).filter(DataOpsQualityCheck.run_id == latest.run_id).order_by(DataOpsQualityCheck.id).all()
+    return DataOpsMonitorService().latest_quality_checks(db, DEFAULT_PIPELINE_KEY)
 
 
 @router.get("/dataops/quarantine", response_model=list[DataOpsQuarantineEventRead])
 def dataops_quarantine(db: Session = Depends(get_db)) -> list[DataOpsQuarantineEvent]:
-    DataOpsMonitorService().sync_running_runs(db)
-    return db.query(DataOpsQuarantineEvent).order_by(DataOpsQuarantineEvent.created_at.desc()).limit(30).all()
+    return DataOpsMonitorService().latest_quarantine_events(db, DEFAULT_PIPELINE_KEY)
 
 
 @router.get("/dataops/assets", response_model=list[DataOpsGeneratedAssetRead])
 def dataops_assets(db: Session = Depends(get_db)) -> list[DataOpsGeneratedAsset]:
-    DataOpsMonitorService().sync_running_runs(db)
-    return db.query(DataOpsGeneratedAsset).order_by(DataOpsGeneratedAsset.created_at.desc()).limit(50).all()
+    return DataOpsMonitorService().latest_assets(db, DEFAULT_PIPELINE_KEY)
+
+
+def _dataops_pipeline_or_404(service: DataOpsMonitorService, db: Session, pipeline_key: str) -> DataOpsPipeline:
+    try:
+        return service.ensure_pipeline(db, pipeline_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="DataOps pipeline not found.") from exc
+
+
+@router.post("/autopilot/analyze", response_model=AutopilotReportRead)
+def run_autopilot_analysis(payload: AutopilotRunRequest, db: Session = Depends(get_db)) -> AutopilotReport:
+    report = AutopilotService().run_analysis(db, actor=payload.actor, include_ai=payload.include_ai)
+    record_audit_event(
+        db,
+        "autopilot.analysis_completed",
+        f"Autopilot analysis completed with risk {report.risk_level}.",
+        actor=payload.actor,
+        severity="warning" if report.risk_level in {"critical", "high"} else "info",
+        metadata={"report_id": report.id, "run_id": report.run_id, "score": report.overall_score},
+    )
+    return report
+
+
+@router.get("/autopilot/latest", response_model=AutopilotCurrentResponse)
+def latest_autopilot_report(db: Session = Depends(get_db)) -> AutopilotCurrentResponse:
+    return AutopilotCurrentResponse(latest_report=AutopilotService().latest_report(db))
+
+
+@router.get("/autopilot/history", response_model=list[AutopilotReportRead])
+def autopilot_history(db: Session = Depends(get_db)) -> list[AutopilotReport]:
+    return AutopilotService().history(db)
+
+
+@router.get("/autopilot/reports/{report_id}", response_model=AutopilotReportRead)
+def get_autopilot_report(report_id: int, db: Session = Depends(get_db)) -> AutopilotReport:
+    report = db.query(AutopilotReport).filter(AutopilotReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Autopilot report not found.")
+    return report
+
+
+@router.post("/autopilot/tasks/{task_id}/status", response_model=AutopilotTaskRead)
+def update_autopilot_task_status(
+    task_id: int,
+    payload: AutopilotTaskStatusUpdateRequest,
+    db: Session = Depends(get_db),
+) -> AutopilotTask:
+    task = AutopilotService().update_task_status(db, task_id, payload.status)
+    if not task:
+        raise HTTPException(status_code=404, detail="Autopilot task not found.")
+    record_audit_event(
+        db,
+        "autopilot.task_status_updated",
+        f"Autopilot task changed to {payload.status}.",
+        actor=payload.actor,
+        metadata={"task_id": task.id, "report_id": task.report_id, "status": payload.status},
+    )
+    return task
+
+
+@router.post("/catalog/sync", response_model=CatalogSyncRunRead)
+def sync_catalog(payload: CatalogSyncRequest, db: Session = Depends(get_db)) -> CatalogSyncRun:
+    service = CatalogGovernanceService()
+    sync_run = service.sync_catalog(db)
+    record_audit_event(
+        db,
+        "catalog.synced",
+        f"Catalog sync finished with status {sync_run.status}.",
+        actor=payload.actor,
+        severity="warning" if sync_run.status == "failed" else "info",
+        metadata={
+            "sync_run_id": sync_run.id,
+            "assets_seen": sync_run.assets_seen,
+            "assets_created": sync_run.assets_created,
+            "assets_updated": sync_run.assets_updated,
+        },
+    )
+    return sync_run
+
+
+@router.get("/catalog/status", response_model=CatalogStatusResponse)
+def catalog_status(db: Session = Depends(get_db)) -> CatalogStatusResponse:
+    return CatalogStatusResponse(**CatalogGovernanceService().status(db))
+
+
+@router.get("/catalog/assets", response_model=list[CatalogAssetRead])
+def catalog_assets(db: Session = Depends(get_db)) -> list[CatalogAsset]:
+    return db.query(CatalogAsset).order_by(CatalogAsset.layer, CatalogAsset.asset_name).all()
+
+
+@router.get("/catalog/assets/{asset_id}", response_model=CatalogAssetRead)
+def catalog_asset(asset_id: int, db: Session = Depends(get_db)) -> CatalogAsset:
+    asset = db.query(CatalogAsset).filter(CatalogAsset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found.")
+    return asset
+
+
+@router.get("/catalog/assets/{asset_id}/columns", response_model=list[CatalogColumnRead])
+def catalog_asset_columns(asset_id: int, db: Session = Depends(get_db)) -> list[CatalogColumn]:
+    asset = db.query(CatalogAsset).filter(CatalogAsset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found.")
+    return db.query(CatalogColumn).filter(CatalogColumn.asset_id == asset_id).order_by(CatalogColumn.id).all()
+
+
+@router.post("/catalog/columns/{column_id}/description", response_model=CatalogColumnRead)
+def update_catalog_column_description(
+    column_id: int, payload: CatalogColumnDescriptionUpdateRequest, db: Session = Depends(get_db)
+) -> CatalogColumn:
+    column = db.query(CatalogColumn).filter(CatalogColumn.id == column_id).first()
+    if not column:
+        raise HTTPException(status_code=404, detail="Catalog column not found.")
+    column.description = payload.description.strip() or None
+    db.commit()
+    db.refresh(column)
+    record_audit_event(
+        db,
+        "catalog.column_documented",
+        "Catalog column description updated.",
+        actor=payload.actor,
+        metadata={"column_id": column.id, "asset_id": column.asset_id, "column_name": column.column_name},
+    )
+    return column
+
+
+@router.get("/catalog/lineage", response_model=list[CatalogLineageEdgeRead])
+def catalog_lineage(db: Session = Depends(get_db)) -> list[CatalogLineageEdge]:
+    return db.query(CatalogLineageEdge).order_by(CatalogLineageEdge.id).all()
+
+
+@router.get("/catalog/classifications", response_model=list[CatalogClassificationRead])
+def catalog_classifications(db: Session = Depends(get_db)) -> list[CatalogClassification]:
+    service = CatalogGovernanceService()
+    service.ensure_reference_data(db)
+    return db.query(CatalogClassification).order_by(CatalogClassification.rank).all()
+
+
+@router.post("/catalog/assets/{asset_id}/document", response_model=CatalogDocumentResponse)
+def document_catalog_asset(asset_id: int, payload: CatalogSyncRequest, db: Session = Depends(get_db)) -> CatalogDocumentResponse:
+    asset = db.query(CatalogAsset).filter(CatalogAsset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found.")
+    documentation = CatalogGovernanceService().generate_documentation(db, asset)
+    record_audit_event(
+        db,
+        "catalog.documented",
+        "Catalog asset documentation generated.",
+        actor=payload.actor,
+        metadata={"asset_id": asset.id, "asset_urn": asset.asset_urn},
+    )
+    return CatalogDocumentResponse(asset=asset, documentation=documentation)
+
+
+@router.post("/catalog/assets/{asset_id}/owner", response_model=CatalogAssetRead)
+def update_catalog_asset_owner(asset_id: int, payload: CatalogOwnerUpdateRequest, db: Session = Depends(get_db)) -> CatalogAsset:
+    asset = db.query(CatalogAsset).filter(CatalogAsset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found.")
+    updated = CatalogGovernanceService().update_owner(db, asset, payload.owner)
+    record_audit_event(
+        db,
+        "catalog.owner_updated",
+        "Catalog owner updated.",
+        actor=payload.actor,
+        metadata={"asset_id": updated.id, "owner": updated.owner},
+    )
+    return updated
+
+
+@router.post("/catalog/assets/{asset_id}/classification", response_model=CatalogAssetRead)
+def update_catalog_asset_classification(
+    asset_id: int, payload: CatalogClassificationUpdateRequest, db: Session = Depends(get_db)
+) -> CatalogAsset:
+    asset = db.query(CatalogAsset).filter(CatalogAsset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found.")
+    updated = CatalogGovernanceService().update_classification(db, asset, payload.classification)
+    record_audit_event(
+        db,
+        "catalog.classification_updated",
+        "Catalog classification updated.",
+        actor=payload.actor,
+        severity="warning" if updated.sensitivity_level in {"confidential", "restricted"} else "info",
+        metadata={"asset_id": updated.id, "classification": updated.sensitivity_level},
+    )
+    return updated
+
+
+@router.get("/catalog/sync-runs", response_model=list[CatalogSyncRunRead])
+def catalog_sync_runs(db: Session = Depends(get_db)) -> list[CatalogSyncRun]:
+    return db.query(CatalogSyncRun).order_by(CatalogSyncRun.started_at.desc()).limit(20).all()
 
 
 def _query_ai_explanation(sql: str, evaluation: dict[str, Any]) -> str:

@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session
 
 from app.models import DataOpsPipeline, DemoCustomer, DemoCustomerTransaction, Deployment, Environment, PlatformSetting, QueryPolicy, Service
 from app.services.audit import record_audit_event
+from app.services.catalog import CatalogGovernanceService
+from app.services.dataops import DataOpsMonitorService
 
 
 def seed_demo_data(db: Session) -> None:
     seed_platform_data(db)
     seed_phase2_data(db)
     seed_phase3_data(db)
+    seed_phase4_data(db)
 
 
 def seed_platform_data(db: Session) -> None:
@@ -137,18 +140,21 @@ def seed_phase2_data(db: Session) -> None:
 
 
 def seed_phase3_data(db: Session) -> None:
-    if db.query(DataOpsPipeline).filter(DataOpsPipeline.name == "tpcds-retail-dataops").first():
-        return
-    db.add(
-        DataOpsPipeline(
-            name="tpcds-retail-dataops",
-            description="TPC-DS retail DataOps pipeline for Bronze, Silver, Gold and quarantine metrics.",
-            status="idle",
-        )
-    )
+    existing_count = db.query(DataOpsPipeline).count()
+    DataOpsMonitorService().ensure_pipelines(db)
     setting = db.query(PlatformSetting).filter(PlatformSetting.key == "databricks_enabled").first()
     if setting:
         setting.value = "demo"
         setting.description = "Phase 3 DataOps Monitor is enabled in demo mode until Databricks secrets are configured."
     db.commit()
-    record_audit_event(db, "phase3.seeded", "DataOps Monitor demo pipeline initialized.")
+    if existing_count == 0:
+        record_audit_event(db, "phase3.seeded", "DataOps Monitor demo pipelines initialized.")
+
+
+def seed_phase4_data(db: Session) -> None:
+    CatalogGovernanceService().ensure_reference_data(db)
+    setting = db.query(PlatformSetting).filter(PlatformSetting.key == "datahub_enabled").first()
+    if setting:
+        setting.value = "demo"
+        setting.description = "Phase 4 Catalog Governance uses internal catalog fallback until DataHub is configured."
+    db.commit()

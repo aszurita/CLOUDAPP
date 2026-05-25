@@ -100,3 +100,31 @@ class AIRecommendationService:
                 "instruction": "Explica el estado, reglas fallidas, impacto en quarantine y acciones siguientes.",
             },
         )
+
+    def generate_catalog_documentation(self, asset_metadata: dict[str, Any]) -> str:
+        system_prompt = (
+            "Eres un data governance copilot. Documenta activos de datos en español usando solo metadata técnica. "
+            "No inventes datos privados, no solicites secretos y no pidas muestras crudas. "
+            "Devuelve secciones breves: propósito, uso recomendado, columnas clave, sensibilidad, riesgos y preguntas pendientes."
+        )
+        return self._complete(
+            system_prompt,
+            {
+                "asset_metadata": asset_metadata,
+                "instruction": "Genera documentación operativa para catálogo de datos sin incluir datos crudos.",
+            },
+        )
+
+    def generate_autopilot_summary(self, report_context: dict[str, Any]) -> str:
+        system_prompt = (
+            "Eres un copiloto ejecutivo de CloudOps, DBA, DataOps y gobierno de datos. "
+            "Resume hallazgos con lenguaje operativo en español, sin secretos, sin datos crudos y sin exagerar. "
+            "Devuelve: estado general, riesgos prioritarios, plan de 3 pasos y criterio de cierre."
+        )
+        return self._complete(
+            system_prompt,
+            {
+                "report_context": report_context,
+                "instruction": "Genera un resumen ejecutivo accionable para el reporte Autopilot.",
+            },
+        )

@@ -24,6 +24,9 @@ def isolate_openai_env(monkeypatch):
     monkeypatch.setenv("DATABRICKS_HOST", "")
     monkeypatch.setenv("DATABRICKS_TOKEN", "")
     monkeypatch.setenv("DATABRICKS_JOB_ID", "")
+    monkeypatch.setenv("DATAHUB_ENABLED", "false")
+    monkeypatch.setenv("DATAHUB_SERVER", "")
+    monkeypatch.setenv("DATAHUB_TOKEN", "")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -193,3 +196,144 @@ def test_dataops_monitor_exposes_quality_assets_and_quarantine() -> None:
     assert any(item["layer"] == "gold" for item in assets.json())
     assert quarantine.status_code == 200
     assert len(quarantine.json()) >= 1
+
+
+def test_dataops_monitor_supports_banking_alerts_pipeline() -> None:
+    pipelines = client.get("/api/dataops/pipelines")
+
+    assert pipelines.status_code == 200
+    assert any(item["pipeline_key"] == "alertas-movimientos-inusuales" for item in pipelines.json())
+
+    response = client.post("/api/dataops/pipelines/alertas-movimientos-inusuales/run", json={"actor": "test-user"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["business_run_id"].startswith("RUN-")
+    assert body["databricks_run_id"] is not None
+    assert body["quarantine_rows"] == 0
+    assert any(metric["key"] == "alerts_generated" and metric["value"] == 2 for metric in body["metrics_json"])
+    assert any(metric["key"] == "transactions_inserted" and metric["label"] == "Source transactions" for metric in body["metrics_json"])
+    assert any("banco_demo.alertas_movimientos_inusuales" in table for table in body["generated_tables_json"])
+    assert len(body["events_json"]) >= 2
+
+    current = client.get("/api/dataops/pipelines/alertas-movimientos-inusuales/current")
+    quality = client.get("/api/dataops/pipelines/alertas-movimientos-inusuales/quality/latest")
+    assets = client.get("/api/dataops/pipelines/alertas-movimientos-inusuales/assets")
+    quarantine = client.get("/api/dataops/pipelines/alertas-movimientos-inusuales/quarantine")
+
+    assert current.status_code == 200
+    assert current.json()["pipeline"]["databricks_job_id"] == "88827781921882"
+    assert "genera transacciones" not in current.json()["pipeline"]["description"].lower()
+    assert current.json()["latest_run"]["business_run_id"] == body["business_run_id"]
+    assert quality.status_code == 200
+    assert any(item["rule_code"] == "email_notification" for item in quality.json())
+    assert all("generadas para la corrida" not in item["description"].lower() for item in quality.json())
+    assert assets.status_code == 200
+    assert any(item["layer"] == "audit" for item in assets.json())
+    assert quarantine.status_code == 200
+    assert quarantine.json() == []
+
+
+def test_catalog_sync_creates_assets_columns_and_lineage() -> None:
+    client.post("/api/dataops/pipelines/run", json={"actor": "test-user"})
+
+    sync_response = client.post("/api/catalog/sync", json={"actor": "test-user"})
+    assert sync_response.status_code == 200
+    sync_body = sync_response.json()
+    assert sync_body["status"] == "success"
+    assert sync_body["assets_seen"] >= 3
+
+    status = client.get("/api/catalog/status")
+    assets = client.get("/api/catalog/assets")
+    lineage = client.get("/api/catalog/lineage")
+
+    assert status.status_code == 200
+    assert status.json()["external_catalog"] == "not_configured"
+    assert status.json()["assets_total"] >= 3
+    assert assets.status_code == 200
+    assert any(asset["layer"] == "gold" for asset in assets.json())
+    assert any(asset["sensitivity_level"] in {"confidential", "restricted"} for asset in assets.json())
+    assert lineage.status_code == 200
+    assert len(lineage.json()) >= 2
+
+    first_asset_id = assets.json()[0]["id"]
+    columns = client.get(f"/api/catalog/assets/{first_asset_id}/columns")
+    assert columns.status_code == 200
+    assert len(columns.json()) >= 1
+
+    first_column = columns.json()[0]
+    assert first_column["description"] is None
+    update_column = client.post(
+        f"/api/catalog/columns/{first_column['id']}/description",
+        json={"description": "Identificador tecnico de ejecucion usado para trazabilidad.", "actor": "test-user"},
+    )
+    assert update_column.status_code == 200
+    assert "trazabilidad" in update_column.json()["description"]
+
+    client.post("/api/catalog/sync", json={"actor": "test-user"})
+    refreshed_columns = client.get(f"/api/catalog/assets/{first_asset_id}/columns").json()
+    refreshed = next(item for item in refreshed_columns if item["column_name"] == first_column["column_name"])
+    assert "trazabilidad" in refreshed["description"]
+
+
+def test_catalog_documentation_and_metadata_updates(monkeypatch) -> None:
+    client.post("/api/dataops/pipelines/run", json={"actor": "test-user"})
+    client.post("/api/catalog/sync", json={"actor": "test-user"})
+    asset = client.get("/api/catalog/assets").json()[0]
+
+    monkeypatch.setattr(
+        AIRecommendationService,
+        "generate_catalog_documentation",
+        lambda self, metadata: "Propósito: documentación gobernada sin datos crudos. Riesgos: validar owner.",
+    )
+
+    doc_response = client.post(f"/api/catalog/assets/{asset['id']}/document", json={"actor": "test-user"})
+    assert doc_response.status_code == 200
+    assert "datos crudos" in doc_response.json()["documentation"]
+    assert doc_response.json()["asset"]["documentation_status"] == "generated"
+
+    owner_response = client.post(
+        f"/api/catalog/assets/{asset['id']}/owner",
+        json={"owner": "data-governance-team", "actor": "test-user"},
+    )
+    assert owner_response.status_code == 200
+    assert owner_response.json()["owner"] == "data-governance-team"
+
+    classification_response = client.post(
+        f"/api/catalog/assets/{asset['id']}/classification",
+        json={"classification": "restricted", "actor": "test-user"},
+    )
+    assert classification_response.status_code == 200
+    assert classification_response.json()["sensitivity_level"] == "restricted"
+
+
+def test_autopilot_analysis_generates_report_tasks_and_history() -> None:
+    client.post("/api/dataops/pipelines/run", json={"actor": "test-user"})
+    client.post("/api/catalog/sync", json={"actor": "test-user"})
+
+    response = client.post("/api/autopilot/analyze", json={"actor": "test-user", "include_ai": False})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "success"
+    assert 0 <= body["overall_score"] <= 100
+    assert body["risk_level"] in {"critical", "high", "medium", "low"}
+    assert body["metrics_json"]["findings_total"] >= 1
+    assert len(body["findings_json"]) >= 1
+    assert body["metrics_json"]["catalog_assets"] >= 1
+    assert "secret" not in str(body["raw_context_json"]).lower()
+
+    latest = client.get("/api/autopilot/latest")
+    history = client.get("/api/autopilot/history")
+
+    assert latest.status_code == 200
+    assert latest.json()["latest_report"]["run_id"] == body["run_id"]
+    assert history.status_code == 200
+    assert any(item["run_id"] == body["run_id"] for item in history.json())
+
+    if body["tasks"]:
+        task_id = body["tasks"][0]["id"]
+        update = client.post(f"/api/autopilot/tasks/{task_id}/status", json={"status": "done", "actor": "test-user"})
+        assert update.status_code == 200
+        assert update.json()["status"] == "done"

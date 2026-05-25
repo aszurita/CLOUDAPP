@@ -1,3 +1,13 @@
+from app.models.catalog import (
+    CatalogAsset,
+    CatalogClassification,
+    CatalogColumn,
+    CatalogDocumentationVersion,
+    CatalogLineageEdge,
+    CatalogOwner,
+    CatalogSyncRun,
+)
+from app.models.autopilot import AutopilotReport, AutopilotTask
 from app.models.dataops import (
     DataOpsGeneratedAsset,
     DataOpsPipeline,
@@ -17,6 +27,15 @@ from app.models.platform import AuditEvent, Deployment, Environment, PlatformSet
 
 __all__ = [
     "AuditEvent",
+    "AutopilotReport",
+    "AutopilotTask",
+    "CatalogAsset",
+    "CatalogClassification",
+    "CatalogColumn",
+    "CatalogDocumentationVersion",
+    "CatalogLineageEdge",
+    "CatalogOwner",
+    "CatalogSyncRun",
     "DataOpsGeneratedAsset",
     "DataOpsPipeline",
     "DataOpsPipelineRun",

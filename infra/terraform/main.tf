@@ -127,6 +127,20 @@ resource "azurerm_key_vault_secret" "databricks_placeholder" {
 
 resource "azurerm_key_vault_secret" "datahub_placeholder" {
   name         = "DATAHUB-SERVER"
+  value        = var.datahub_server != "" ? var.datahub_server : "phase-4-placeholder"
+  key_vault_id = azurerm_key_vault.main.id
+  depends_on   = [azurerm_key_vault_access_policy.deployer]
+}
+
+resource "azurerm_key_vault_secret" "datahub_token_placeholder" {
+  name         = "DATAHUB-TOKEN"
+  value        = "phase-4-placeholder"
+  key_vault_id = azurerm_key_vault.main.id
+  depends_on   = [azurerm_key_vault_access_policy.deployer]
+}
+
+resource "azurerm_key_vault_secret" "purview_client_secret_placeholder" {
+  name         = "PURVIEW-CLIENT-SECRET"
   value        = "phase-4-placeholder"
   key_vault_id = azurerm_key_vault.main.id
   depends_on   = [azurerm_key_vault_access_policy.deployer]
@@ -155,6 +169,16 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "openai-api-key"
     value = azurerm_key_vault_secret.openai_placeholder.value
+  }
+
+  secret {
+    name  = "datahub-token"
+    value = azurerm_key_vault_secret.datahub_token_placeholder.value
+  }
+
+  secret {
+    name  = "purview-client-secret"
+    value = azurerm_key_vault_secret.purview_client_secret_placeholder.value
   }
 
   secret {
@@ -226,6 +250,41 @@ resource "azurerm_container_app" "backend" {
       env {
         name        = "OPENAI_API_KEY"
         secret_name = "openai-api-key"
+      }
+
+      env {
+        name  = "CATALOG_PROVIDER"
+        value = var.catalog_provider
+      }
+
+      env {
+        name  = "DATAHUB_SERVER"
+        value = var.datahub_server
+      }
+
+      env {
+        name  = "DATAHUB_ENABLED"
+        value = tostring(var.datahub_enabled)
+      }
+
+      env {
+        name        = "DATAHUB_TOKEN"
+        secret_name = "datahub-token"
+      }
+
+      env {
+        name  = "PURVIEW_ENDPOINT"
+        value = var.purview_endpoint
+      }
+
+      env {
+        name  = "PURVIEW_ENABLED"
+        value = tostring(var.purview_enabled)
+      }
+
+      env {
+        name        = "PURVIEW_CLIENT_SECRET"
+        secret_name = "purview-client-secret"
       }
     }
   }
