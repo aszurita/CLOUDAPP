@@ -22,6 +22,7 @@ from app.models import (
     DbaTableProfile,
 )
 from app.services.ai import AIConfigurationError, AIRecommendationService
+from app.services.database_inventory import collect_database_inventory
 
 
 CLASSIFICATIONS = [
@@ -163,6 +164,10 @@ class CatalogGovernanceService:
         return candidates
 
     def _postgres_asset_candidates(self, db: Session) -> list[dict[str, Any]]:
+        inventory_candidates = self._inventory_asset_candidates()
+        if inventory_candidates:
+            return inventory_candidates
+
         profiles = db.query(DbaTableProfile).order_by(DbaTableProfile.table_name).all()
         if not profiles:
             profiles = [
@@ -198,6 +203,68 @@ class CatalogGovernanceService:
                 ),
             ]
         return [self._candidate_from_profile(profile) for profile in profiles]
+
+    def _inventory_asset_candidates(self) -> list[dict[str, Any]]:
+        try:
+            inventory = collect_database_inventory(self.settings)
+        except Exception:
+            return []
+
+        candidates: list[dict[str, Any]] = []
+        for source in inventory.get("sources", []):
+            if source.get("status") != "available":
+                continue
+            platform = "postgres" if source.get("engine") in {"postgresql", "postgres"} else str(source.get("engine") or "database")
+            source_key = str(source.get("key") or source.get("role") or platform)
+            database_name = str(source.get("database_name") or source.get("label") or source_key)
+            role = str(source.get("role") or "database")
+            for schema in source.get("schemas", []):
+                schema_name = str(schema.get("name") or "main")
+                for table in schema.get("tables", []):
+                    table_name = str(table.get("name") or "table")
+                    if table.get("internal") and role != "monitored_database":
+                        layer = "operational"
+                    else:
+                        layer = "lab" if role == "monitored_database" else "operational"
+                    columns = []
+                    for column in table.get("columns", []):
+                        name = str(column.get("name") or "column")
+                        sensitivity = "restricted" if column.get("sensitive") else "internal"
+                        columns.append(
+                            {
+                                "column_name": name,
+                                "data_type": str(column.get("type") or "unknown"),
+                                "nullable": bool(column.get("nullable", True)),
+                                "classification": sensitivity,
+                                "is_sensitive": sensitivity == "restricted",
+                                "description": self._column_description(name),
+                                "sample_safe_value": None,
+                            }
+                        )
+                    asset_sensitivity = "restricted" if any(col["is_sensitive"] for col in columns) else "internal"
+                    table_fqn = f"{database_name}.{schema_name}.{table_name}"
+                    candidates.append(
+                        {
+                            "asset_urn": self._dataset_urn(platform, table_fqn),
+                            "asset_name": table_name,
+                            "display_name": f"{database_name} · {schema_name} · {table_name}",
+                            "source_system": source_key,
+                            "platform": platform,
+                            "database_name": database_name,
+                            "schema_name": schema_name,
+                            "table_name": table_name,
+                            "layer": layer,
+                            "domain": self._domain_for_asset(table_name, layer),
+                            "owner": "data-platform-team",
+                            "description": None,
+                            "documentation_status": "missing",
+                            "quality_score": None,
+                            "sensitivity_level": asset_sensitivity,
+                            "external_url": None,
+                            "columns": columns,
+                        }
+                    )
+        return candidates
 
     def _candidate_from_dataops(self, asset: DataOpsGeneratedAsset, run: DataOpsPipelineRun | None) -> dict[str, Any]:
         storage_path = asset.storage_path or asset.asset_name

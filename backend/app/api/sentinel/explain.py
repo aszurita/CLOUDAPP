@@ -40,7 +40,17 @@ async def explain_current_state(
     )
 
     incident_id = None
-    if request.persist_incident:
+    predicted_type = _incident_type_from_context(prediction, rca_result)
+    risk_score = float(prediction.get("risk_score") or 0.0)
+    should_persist = (
+        request.persist_incident
+        and predicted_type != "none"
+        and (
+            bool(prediction.get("has_predicted_incident"))
+            or risk_score >= settings.sentinel_risk_threshold
+        )
+    )
+    if should_persist:
         incident = _save_incident(
             db=db,
             request=request,
@@ -59,6 +69,17 @@ async def explain_current_state(
         )
     analysis["incident_id"] = incident_id
     return analysis
+
+
+def _incident_type_from_context(prediction: dict[str, Any], rca_result: dict[str, Any]) -> str:
+    predicted_type = str(prediction.get("predicted_incident_type") or "none")
+    if predicted_type != "none":
+        return predicted_type
+    risk_score = float(prediction.get("risk_score") or 0.0)
+    if risk_score >= settings.sentinel_risk_threshold:
+        primary_cause = str(rca_result.get("primary_cause") or "unclassified_risk")
+        return primary_cause if primary_cause != "unknown" else "unclassified_risk"
+    return "none"
 
 
 def _build_prediction_context(
@@ -142,7 +163,7 @@ def _save_incident(
         predicted_for=detected_at + timedelta(minutes=request.horizon_minutes),
         engine=request.engine,
         database_name=request.database_name,
-        incident_type=prediction.get("predicted_incident_type"),
+        incident_type=_incident_type_from_context(prediction, rca_result),
         risk_score=prediction.get("risk_score"),
         impact_level=analysis.get("severity_classification") or prediction.get("impact_level"),
         root_cause_top1=rca_result.get("primary_cause"),

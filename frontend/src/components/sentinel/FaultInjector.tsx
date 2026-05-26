@@ -8,13 +8,15 @@ import { SeverityBadge } from "./SeverityBadge";
 type Props = {
   faults: FaultType[];
   onJob: (job: FaultJob) => void;
+  onDemoRun?: (faultType: string, durationSeconds: number, intensity: string) => Promise<void>;
 };
 
-export function FaultInjector({ faults, onJob }: Props) {
+export function FaultInjector({ faults, onJob, onDemoRun }: Props) {
   const [faultType, setFaultType] = useState(faults[0]?.id ?? "lock_wait_storm");
   const [duration, setDuration] = useState(240);
   const [intensity, setIntensity] = useState("medium");
   const [busy, setBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(false);
 
   async function run() {
     setBusy(true);
@@ -23,6 +25,16 @@ export function FaultInjector({ faults, onJob }: Props) {
       onJob(job);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function runDemo() {
+    if (!onDemoRun) return;
+    setDemoBusy(true);
+    try {
+      await onDemoRun(faultType, duration, intensity);
+    } finally {
+      setDemoBusy(false);
     }
   }
 
@@ -56,10 +68,16 @@ export function FaultInjector({ faults, onJob }: Props) {
           </select>
         </label>
       </div>
-      <button className="primary sentinel-run-btn" onClick={() => void run()} disabled={busy || faults.length === 0}>
-        {selected?.has_lab_script ? <Terminal size={16} /> : <Play size={16} />}
-        {busy ? "Preparando" : "Preparar dry-run"}
-      </button>
+      <div className="button-row sentinel-lab-actions">
+        <button className="primary" onClick={() => void run()} disabled={busy || demoBusy || faults.length === 0}>
+          {selected?.has_lab_script ? <Terminal size={16} /> : <Play size={16} />}
+          {busy ? "Preparando" : "Preparar dry-run"}
+        </button>
+        <button onClick={() => void runDemo()} disabled={!onDemoRun || demoBusy || busy || faults.length === 0}>
+          <Play size={16} />
+          {demoBusy ? "Ejecutando" : "Demo controlado"}
+        </button>
+      </div>
     </section>
   );
 }

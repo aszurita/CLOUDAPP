@@ -100,6 +100,12 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "client" {
   end_ip_address   = var.allowed_client_ip
 }
 
+resource "azurerm_postgresql_flexible_server_configuration" "allowed_extensions" {
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  value     = "PG_STAT_STATEMENTS"
+}
+
 locals {
   database_url = "postgresql+psycopg://${var.postgres_admin_user}:${urlencode(random_password.postgres_password.result)}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require"
 }
@@ -181,6 +187,14 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "databricks-token"
     value = azurerm_key_vault_secret.databricks_token_placeholder.value
+  }
+
+  dynamic "secret" {
+    for_each = var.sentinel_monitor_db_url == "" ? [] : [var.sentinel_monitor_db_url]
+    content {
+      name  = "sentinel-monitor-db-url"
+      value = secret.value
+    }
   }
 
   secret {
@@ -317,6 +331,34 @@ resource "azurerm_container_app" "backend" {
       env {
         name  = "SENTINEL_FEATURE_SCHEMA_PATH"
         value = "./artifacts/feature_schema.json"
+      }
+
+      dynamic "env" {
+        for_each = var.sentinel_monitor_db_url == "" ? [] : [1]
+        content {
+          name        = "SENTINEL_MONITOR_DB_URL"
+          secret_name = "sentinel-monitor-db-url"
+        }
+      }
+
+      env {
+        name  = "SENTINEL_MONITOR_DATABASE_NAME"
+        value = var.sentinel_monitor_database_name
+      }
+
+      env {
+        name  = "SENTINEL_ENABLE_AUTO_COLLECT"
+        value = tostring(var.sentinel_enable_auto_collect)
+      }
+
+      env {
+        name  = "SENTINEL_COLLECT_INTERVAL_SECONDS"
+        value = tostring(var.sentinel_collect_interval_seconds)
+      }
+
+      env {
+        name  = "SENTINEL_RISK_THRESHOLD"
+        value = tostring(var.sentinel_risk_threshold)
       }
 
       env {

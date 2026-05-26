@@ -43,6 +43,8 @@ import {
   DataOpsQualityCheck,
   DataOpsQuarantineEvent,
   DataOpsRunEvent,
+  DatabaseInventory,
+  DatabaseSourceMetadata,
   DbaAnalyzeResponse,
   DbaRecommendation,
   DbaTableProfile,
@@ -66,6 +68,7 @@ import {
   getCatalogStatus,
   getCatalogSyncRuns,
   getDbaRecommendations,
+  getDbaSources,
   getDbaTables,
   getDataOpsAssets,
   getDataOpsCurrent,
@@ -78,6 +81,7 @@ import {
   getEnvironments,
   getPlatformStatus,
   getQueryHistory,
+  getQueryMetadata,
   getQueryPolicies,
   getServices,
   runAutopilotAnalysis,
@@ -100,8 +104,9 @@ function statusTone(status: string) {
   if (status === "source") return "layer-source";
   if (status === "audit") return "layer-audit";
   if (status === "alert") return "layer-alert";
+  if (status === "lab") return "layer-lab";
   if (status === "operational") return "layer-operational";
-  if (["healthy", "success", "connected", "approved", "low", "configured", "passed"].includes(status)) {
+  if (["healthy", "success", "connected", "approved", "low", "configured", "passed", "available"].includes(status)) {
     return "text-emerald-700 bg-emerald-50 border-emerald-200";
   }
   if (["attention", "degraded", "medium", "warning", "running", "high"].includes(status)) return "text-amber-700 bg-amber-50 border-amber-200";
@@ -578,17 +583,19 @@ function QueryGovernance() {
   const [sql, setSql] = useState("");
   const [policies, setPolicies] = useState<QueryPolicy[]>([]);
   const [history, setHistory] = useState<QueryReview[]>([]);
+  const [metadata, setMetadata] = useState<DatabaseInventory | null>(null);
   const [analysis, setAnalysis] = useState<QueryAnalyzeResponse | null>(null);
   const [execution, setExecution] = useState<QueryExecuteResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getDemoQueries(), getQueryPolicies(), getQueryHistory()])
-      .then(([demoQueries, policyList, queryHistory]) => {
+    Promise.all([getDemoQueries(), getQueryPolicies(), getQueryHistory(), getQueryMetadata()])
+      .then(([demoQueries, policyList, queryHistory, inventory]) => {
         setSql(demoQueries.dangerous);
         setPolicies(policyList);
         setHistory(queryHistory);
+        setMetadata(inventory);
       })
       .catch((requestError) => setError(getErrorMessage(requestError)));
   }, []);
@@ -701,6 +708,7 @@ function QueryGovernance() {
             ))}
           </div>
         </div>
+        <DatabaseInventoryPanel inventory={metadata} title="Bases y tablas" />
         <div className="panel">
           <div className="panel-heading">
             <h2>History</h2>
@@ -720,6 +728,53 @@ function QueryGovernance() {
         </div>
       </aside>
     </section>
+  );
+}
+
+function DatabaseInventoryPanel({ inventory, title }: { inventory: DatabaseInventory | null; title: string }) {
+  const sources = inventory?.sources ?? [];
+  return (
+    <div className="panel database-inventory-panel">
+      <div className="panel-heading">
+        <h2>{title}</h2>
+        <span>{sources.length}</span>
+      </div>
+      <div className="database-source-list">
+        {sources.length === 0 && <p className="catalog-muted">Inventario no disponible.</p>}
+        {sources.map((source) => (
+          <DatabaseSourceCard key={source.key} source={source} compact />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DatabaseSourceCard({ source, compact = false }: { source: DatabaseSourceMetadata; compact?: boolean }) {
+  const tables = source.schemas.flatMap((schema) => schema.tables.map((table) => ({ ...table, schema: schema.name })));
+  return (
+    <article className="database-source-card">
+      <div className="database-source-head">
+        <div>
+          <strong>{source.database_name}</strong>
+          <small>{source.engine} · {source.role} · {source.lab_mode}</small>
+        </div>
+        <StatusBadge value={source.status} />
+      </div>
+      {source.error && <p className="catalog-muted">{source.error}</p>}
+      <div className="database-source-stats">
+        <span>{source.table_count} tablas</span>
+        <span>{source.queryable_table_count} queryables</span>
+        {source.host && <span>{source.host}</span>}
+      </div>
+      <div className="database-table-chips">
+        {tables.slice(0, compact ? 8 : 18).map((table) => (
+          <span className={table.allowed_query ? "queryable" : table.internal ? "internal" : ""} key={table.qualified_name}>
+            {table.schema}.{table.name}
+          </span>
+        ))}
+        {tables.length > (compact ? 8 : 18) && <span>+{tables.length - (compact ? 8 : 18)}</span>}
+      </div>
+    </article>
   );
 }
 
@@ -819,16 +874,18 @@ function timeAgo(date: Date): string {
 function DbaCopilot() {
   const [tables, setTables] = useState<DbaTableProfile[]>([]);
   const [recommendations, setRecommendations] = useState<DbaRecommendation[]>([]);
+  const [sources, setSources] = useState<DatabaseInventory | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<Date | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getDbaTables(), getDbaRecommendations()])
-      .then(([tableProfiles, recommendationList]) => {
+    Promise.all([getDbaTables(), getDbaRecommendations(), getDbaSources()])
+      .then(([tableProfiles, recommendationList, inventory]) => {
         setTables(tableProfiles);
         setRecommendations(recommendationList);
+        setSources(inventory);
         if (recommendationList.length > 0) setLastRun(new Date());
       })
       .catch((requestError) => setError(getErrorMessage(requestError)));
@@ -839,9 +896,14 @@ function DbaCopilot() {
     setError(null);
     try {
       const summary: DbaAnalyzeResponse = await runDbaAnalysis();
-      const [tableProfiles, recommendationList] = await Promise.all([getDbaTables(), getDbaRecommendations()]);
+      const [tableProfiles, recommendationList, inventory] = await Promise.all([
+        getDbaTables(),
+        getDbaRecommendations(),
+        getDbaSources(),
+      ]);
       setTables(tableProfiles);
       setRecommendations(recommendationList);
+      setSources(inventory);
       setAiSummary(summary.ai_summary);
       setLastRun(new Date());
     } catch (requestError) {
@@ -870,6 +932,11 @@ function DbaCopilot() {
     return result;
   }, [recommendations]);
   const summaryFindings = useMemo(() => parseDbaAiSummary(aiSummary), [aiSummary]);
+  const sourceSummary = useMemo(() => {
+    const sourceList = sources?.sources ?? [];
+    if (sourceList.length === 0) return "sin fuentes registradas";
+    return sourceList.map((source) => `${source.database_name} (${source.role})`).join(" · ");
+  }, [sources]);
 
   const updatedText = lastRun ? `Actualizado hace ${timeAgo(lastRun)}` : "Sin análisis previo";
 
@@ -882,7 +949,7 @@ function DbaCopilot() {
             Análisis DBA con IA
           </h2>
           <p className="dba-subtitle">
-            Analizadas {tables.length} tablas · {recommendations.length} acciones sugeridas · {updatedText}
+            Analizadas {tables.length} tablas · {recommendations.length} acciones sugeridas · {sourceSummary} · {updatedText}
           </p>
         </div>
         <button className="primary" onClick={() => void analyze()} disabled={busy}>
@@ -892,6 +959,8 @@ function DbaCopilot() {
       </div>
 
       <ErrorNotice error={error} />
+
+      <DatabaseInventoryPanel inventory={sources} title="Fuentes DBA" />
 
       {aiSummary && (
         <div className="panel dba-summary-panel">
@@ -1201,8 +1270,8 @@ function DataOpsMonitor({ onRunStatusChange }: { onRunStatusChange: (run: DataOp
   const currentRunLabel = currentRun?.business_run_id || currentRun?.run_id;
   const isBankingPipeline = selectedPipeline?.pipeline_type === "banking_fraud_alerts";
   const tableCountLabel = isBankingPipeline ? "tablas monitoreadas" : "tablas generadas";
-  const assetsTitle = isBankingPipeline ? "Monitored Tables" : "Generated Assets";
-  const emptyAssetsText = isBankingPipeline ? "Sin tablas monitoreadas todavia." : "Sin assets generados todavia.";
+  const assetsTitle = isBankingPipeline ? "Tablas Monitoreadas" : "Tablas Generadas";
+  const emptyAssetsText = isBankingPipeline ? "Sin tablas monitoreadas todavia." : "Sin tablas generadas todavia.";
   const databricksUrl = realDatabricksUrl(currentRun);
   const showDatabricksRunId = Boolean(
     currentRun?.databricks_run_id && currentRun.databricks_run_id !== currentRunLabel && !isLocalDataOpsRun(currentRun)
@@ -1438,7 +1507,7 @@ function CatalogGovernance() {
       getCatalogSyncRuns(),
     ]);
     const normalizedAssets = [...catalogAssets].sort((a, b) => {
-      const layerOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, operational: 3 };
+      const layerOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, lab: 3, operational: 4 };
       return (layerOrder[a.layer] ?? 9) - (layerOrder[b.layer] ?? 9) || a.asset_name.localeCompare(b.asset_name);
     });
     setStatus(catalogStatus);
@@ -1557,6 +1626,7 @@ function CatalogGovernance() {
   const sensitiveColumns = columns.filter((column) => column.is_sensitive);
   const inbound = selectedAsset ? lineage.filter((edge) => edge.target_asset_urn === selectedAsset.asset_urn) : [];
   const outbound = selectedAsset ? lineage.filter((edge) => edge.source_asset_urn === selectedAsset.asset_urn) : [];
+  const sourceSystems = useMemo(() => Array.from(new Set(assets.map((asset) => asset.source_system))), [assets]);
 
   return (
     <div className="catalog-governance">
@@ -1580,27 +1650,27 @@ function CatalogGovernance() {
       <ErrorNotice error={error} />
 
       <section className="metrics-grid catalog-metrics">
-        <Stat label="Assets" value={status?.assets_total ?? assets.length} icon={Database} />
+        <Stat label="Tablas" value={status?.assets_total ?? assets.length} icon={Database} />
         <Stat label="Documented" value={status?.documented_assets ?? 0} icon={BookOpen} />
         <Stat label="Sensitive cols" value={status?.sensitive_columns ?? 0} icon={ShieldCheck} />
         <Stat label="Lineage edges" value={status?.lineage_edges ?? lineage.length} icon={Network} />
-        <Stat label="Provider" value={status?.external_catalog ?? "not_configured"} icon={Tags} />
+        <Stat label="Sources" value={sourceSystems.length || status?.external_catalog || "0"} icon={Tags} />
       </section>
 
       <section className="catalog-ops-layout">
         <aside className="panel catalog-sidebar">
           <div className="panel-heading">
-            <h2>Assets</h2>
+            <h2>Tablas</h2>
             <span>{filteredAssets.length}</span>
           </div>
           <div className="catalog-filters">
             <select value={layerFilter} onChange={(event) => setLayerFilter(event.target.value)}>
               {layerOptions.map((layer) => (
-                <option key={layer} value={layer}>{layer === "all" ? "All layers" : layer}</option>
+                <option key={layer} value={layer}>{layer === "all" ? "Todas las capas" : layer}</option>
               ))}
             </select>
             <select value={classificationFilter} onChange={(event) => setClassificationFilter(event.target.value)}>
-              <option value="all">All classes</option>
+              <option value="all">Todas las clases</option>
               {classifications.map((item) => (
                 <option key={item.code} value={item.code}>{item.label}</option>
               ))}
@@ -1615,7 +1685,7 @@ function CatalogGovernance() {
               >
                 <span>
                   <strong>{asset.asset_name}</strong>
-                  <small>{asset.platform} · {asset.owner}</small>
+                  <small>{asset.platform} · {asset.database_name ?? "-"} · {asset.schema_name ?? "-"}</small>
                 </span>
                 <StatusBadge value={asset.layer} />
               </button>
@@ -1631,7 +1701,7 @@ function CatalogGovernance() {
                   <div>
                     <p className="eyebrow">{selectedAsset.source_system} · {domainLabel(selectedAsset.domain)}</p>
                     <h2>{selectedAsset.display_name}</h2>
-                    <p>{selectedAsset.database_name}.{selectedAsset.schema_name}.{selectedAsset.table_name}</p>
+                    <p>{selectedAsset.platform} · {selectedAsset.database_name ?? "-"}.{selectedAsset.schema_name ?? "-"}.{selectedAsset.table_name}</p>
                   </div>
                   <div className="catalog-detail-actions">
                     <StatusBadge value={selectedAsset.sensitivity_level} />
@@ -1642,6 +1712,25 @@ function CatalogGovernance() {
                         Source
                       </a>
                     )}
+                  </div>
+                </div>
+
+                <div className="catalog-origin-grid">
+                  <div className="catalog-origin-chip">
+                    <span>Sistema</span>
+                    <strong>{selectedAsset.source_system}</strong>
+                  </div>
+                  <div className="catalog-origin-chip">
+                    <span>Base</span>
+                    <strong>{selectedAsset.database_name ?? "-"}</strong>
+                  </div>
+                  <div className="catalog-origin-chip">
+                    <span>Esquema</span>
+                    <strong>{selectedAsset.schema_name ?? "-"}</strong>
+                  </div>
+                  <div className="catalog-origin-chip">
+                    <span>Capa</span>
+                    <strong>{selectedAsset.layer}</strong>
                   </div>
                 </div>
 
@@ -1671,7 +1760,7 @@ function CatalogGovernance() {
                 ) : (
                   <div className="catalog-doc empty-doc">
                     <BookOpen size={24} aria-hidden="true" />
-                    <p>Documentation pending.</p>
+                    <p>Documentacion pendiente.</p>
                   </div>
                 )}
               </div>
@@ -1680,7 +1769,7 @@ function CatalogGovernance() {
           ) : (
             <div className="panel dba-empty">
               <BookOpen size={32} aria-hidden="true" />
-              <p>Sync the catalog to load governed assets.</p>
+              <p>Sincroniza el catalogo para cargar tablas gobernadas.</p>
             </div>
           )}
         </div>
@@ -1696,7 +1785,7 @@ function CatalogGovernance() {
                 <div className="data-row" key={run.id}>
                   <div>
                     <strong>{run.source}</strong>
-                    <p>{run.assets_seen} seen · {run.assets_created} new · {new Date(run.started_at).toLocaleString()}</p>
+                    <p>{run.assets_seen} tablas vistas · {run.assets_created} nuevas · {new Date(run.started_at).toLocaleString()}</p>
                   </div>
                   <StatusBadge value={run.status} />
                 </div>
@@ -1720,7 +1809,7 @@ function CatalogGovernance() {
                     </div>
                   </div>
                 ))}
-                {inbound.length + outbound.length === 0 && <p className="catalog-muted">No lineage edges for this asset.</p>}
+                {inbound.length + outbound.length === 0 && <p className="catalog-muted">Sin linaje para esta tabla.</p>}
               </div>
             </div>
           )}
@@ -1731,12 +1820,12 @@ function CatalogGovernance() {
         <section className="catalog-metadata-section">
           <div className="panel catalog-dictionary-panel">
             <div className="panel-heading">
-              <h2>Metadata Dictionary</h2>
+              <h2>Diccionario de Metadata</h2>
               <span>{columns.length} fields · {sensitiveColumns.length} sensitive</span>
             </div>
             <div className="catalog-dictionary-table">
               <div className="catalog-dictionary-row catalog-dictionary-head">
-                <span>Field</span>
+                <span>Columna</span>
                 <span>Type</span>
                 <span>Structure</span>
                 <span>Classification</span>

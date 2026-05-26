@@ -155,6 +155,9 @@ class DBACopilotService:
         has_incident = bool(prediction.get("has_predicted_incident", False))
         predicted_type = prediction.get("predicted_incident_type", "none")
         primary_cause = rca_result.get("primary_cause", "unknown")
+        if predicted_type == "none" and risk_score >= self.settings.sentinel_risk_threshold:
+            predicted_type = primary_cause if primary_cause != "unknown" else "unclassified_risk"
+            has_incident = True
         confidence = float(rca_result.get("primary_confidence", 0.0) or 0.0)
         severity = self._severity_from_context(risk_score, impact_level, has_incident)
         affected_operations = self._affected_operations(primary_cause, predicted_type)

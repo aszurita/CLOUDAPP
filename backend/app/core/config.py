@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # ── DB Sentinel AI ────────────────────────────────────────────────────────
     sentinel_monitor_db_url: str | None = None
+    sentinel_monitor_database_name: str | None = None
     sentinel_model_path: str = "./artifacts/incident_predictor.pkl"
     sentinel_rca_model_path: str = "./artifacts/root_cause_model.pkl"
     sentinel_feature_schema_path: str = "./artifacts/feature_schema.json"

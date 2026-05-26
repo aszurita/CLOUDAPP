@@ -36,8 +36,7 @@ class DataOpsMonitorService:
         self.settings = get_settings()
 
     def list_pipelines(self, db: Session) -> list[DataOpsPipeline]:
-        self.ensure_pipelines(db)
-        return db.query(DataOpsPipeline).order_by(DataOpsPipeline.id).all()
+        return sorted(self.ensure_pipelines(db), key=lambda pipeline: pipeline.id)
 
     def ensure_pipelines(self, db: Session) -> list[DataOpsPipeline]:
         pipelines: list[DataOpsPipeline] = []
@@ -75,6 +74,10 @@ class DataOpsMonitorService:
 
     def ensure_pipeline(self, db: Session, pipeline_key: str = DEFAULT_PIPELINE_KEY) -> DataOpsPipeline:
         normalized_key = _normalize_pipeline_key(pipeline_key)
+        definitions = self._pipeline_definitions()
+        definition_names = {str(definition["name"]) for definition in definitions.values()}
+        if normalized_key not in definitions and normalized_key not in definition_names:
+            raise ValueError(f"Unknown DataOps pipeline: {pipeline_key}")
         self.ensure_pipelines(db)
         pipeline = (
             db.query(DataOpsPipeline)
@@ -188,6 +191,7 @@ class DataOpsMonitorService:
 
     def _pipeline_definitions(self) -> dict[str, dict]:
         catalog = self.settings.databricks_catalog
+        configured_definitions = self._configured_pipeline_definitions()
         definitions = {
             DEFAULT_PIPELINE_KEY: {
                 "name": "tpcds-retail-dataops",
@@ -225,7 +229,10 @@ class DataOpsMonitorService:
                 },
             },
         }
-        definitions.update(self._configured_pipeline_definitions())
+
+        if configured_definitions:
+            return dict(configured_definitions)
+
         return definitions
 
     def _configured_pipeline_definitions(self) -> dict[str, dict]:

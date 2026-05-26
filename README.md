@@ -76,3 +76,4 @@ brew install azure-cli
 - [Guía de despliegue](docs/deployment.md)
 - [Costos y apagado](docs/costs-and-shutdown.md)
 - [Demo fase 1](docs/demo-phase-1.md)
+- [Arquitectura final](docs/final-architecture.md)

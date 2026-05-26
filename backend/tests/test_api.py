@@ -237,6 +237,7 @@ def test_dataops_monitor_supports_banking_alerts_pipeline() -> None:
 
 
 def test_dataops_monitor_supports_configured_databricks_jobs(monkeypatch) -> None:
+    monkeypatch.delenv("DATABRICKS_JOB_ID", raising=False)
     monkeypatch.setenv(
         "DATAOPS_PIPELINES_JSON",
         json.dumps(
@@ -259,6 +260,7 @@ def test_dataops_monitor_supports_configured_databricks_jobs(monkeypatch) -> Non
 
     assert response.status_code == 200
     pipelines = {item["pipeline_key"]: item for item in response.json()}
+    assert set(pipelines) == {"riesgo-clientes-gold"}
     assert "riesgo-clientes-gold" in pipelines
     assert pipelines["riesgo-clientes-gold"]["databricks_job_id"] == "123456789"
     assert pipelines["riesgo-clientes-gold"]["config_json"]["summary_task_key"] == "emit_run_summary"

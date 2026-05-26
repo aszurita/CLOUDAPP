@@ -100,7 +100,12 @@ class IncidentPredictorService:
         ]
 
         impact_predictions = self._predict_impact(x)
-        predicted_type = top_predictions[0]["incident_type"] if has_incident else "none"
+        predicted_type = "none"
+        if has_incident:
+            predicted_type = next(
+                (item["incident_type"] for item in top_predictions if item["incident_type"] != "none"),
+                "unclassified_risk",
+            )
         impact_level = self._risk_to_impact(risk_score)
         if impact_predictions:
             impact_level = impact_predictions[0]["impact_level"]

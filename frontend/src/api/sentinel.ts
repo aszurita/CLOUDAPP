@@ -42,6 +42,44 @@ export type SentinelLiveMetrics = {
   message?: string | null;
 };
 
+export type SentinelStatus = {
+  environment: string;
+  storage_database_name: string;
+  monitor_database_configured: boolean;
+  monitor_database_name: string;
+  monitor_lab_mode: string;
+  auto_collect_enabled: boolean;
+  collector_initialized: boolean;
+  collector_running: boolean;
+  collector_interval_seconds: number;
+  risk_threshold: number;
+  total_samples: number;
+  query_samples: number;
+  incidents_total: number;
+  last_collected_at?: string | null;
+  predictor: {
+    configured_path: string;
+    path_exists: boolean;
+    loaded: boolean;
+    model_version?: string | null;
+    feature_count?: number;
+    error?: string | null;
+  };
+  rca: {
+    configured_path: string;
+    path_exists: boolean;
+    loaded: boolean;
+    model_version?: string | null;
+    feature_count?: number;
+    error?: string | null;
+  };
+};
+
+export type SentinelCollectResponse = {
+  status: string;
+  sample: SentinelLiveMetrics;
+};
+
 export type SentinelMetricPoint = SentinelLiveMetrics & {
   locks_granted?: number | null;
   locks_waiting?: number | null;
@@ -169,8 +207,12 @@ export type FaultJob = {
   duration_seconds: number;
   intensity: string;
   started_at: string;
+  finished_at?: string | null;
   plan: string[];
   command?: string | null;
+  processes?: Array<{ name: string; pid: number }>;
+  logs?: Array<{ name: string; stdout: string; stderr: string }>;
+  error?: string | null;
 };
 
 export type ModelMetricsResponse = {
@@ -215,6 +257,14 @@ export function fetchSentinelLiveMetrics() {
   return request<SentinelLiveMetrics>(`${BASE}/metrics/live`);
 }
 
+export function fetchSentinelStatus() {
+  return request<SentinelStatus>(`${BASE}/status`);
+}
+
+export function triggerSentinelCollection() {
+  return request<SentinelCollectResponse>(`${BASE}/collect/trigger`, { method: "POST" });
+}
+
 export function fetchSentinelMetricsHistory(minutes = 60) {
   return request<SentinelMetricPoint[]>(`${BASE}/metrics/history?minutes=${minutes}`);
 }
@@ -223,12 +273,12 @@ export function fetchSentinelQueries(minutes = 30) {
   return request<SentinelQuerySample[]>(`${BASE}/metrics/queries?minutes=${minutes}`);
 }
 
-export function predictSentinelIncident() {
+export function predictSentinelIncident(databaseName = "core_banking_sim") {
   return request<SentinelPrediction>(`${BASE}/predict`, {
     method: "POST",
     body: JSON.stringify({
       engine: "postgresql",
-      database_name: "core_banking_sim",
+      database_name: databaseName,
       window_minutes: 10,
       horizon_minutes: 10,
     }),
@@ -251,16 +301,16 @@ export function fetchSentinelIncidentEvidence(id: number) {
   return request<IncidentEvidence>(`${BASE}/incidents/${id}/evidence`);
 }
 
-export function explainSentinelCurrent() {
+export function explainSentinelCurrent(options: { databaseName?: string; persistIncident?: boolean } = {}) {
   return request<CopilotResponse>(`${BASE}/explain`, {
     method: "POST",
     body: JSON.stringify({
       engine: "postgresql",
-      database_name: "core_banking_sim",
+      database_name: options.databaseName ?? "core_banking_sim",
       window_minutes: 10,
       horizon_minutes: 10,
       use_llm: false,
-      persist_incident: false,
+      persist_incident: options.persistIncident ?? false,
     }),
   });
 }
@@ -288,11 +338,15 @@ export function fetchSentinelFaults() {
   return request<{ faults: FaultType[] }>(`${BASE}/simulate/faults`);
 }
 
-export function simulateSentinelFault(faultType: string, durationSeconds: number, intensity: string) {
+export function simulateSentinelFault(faultType: string, durationSeconds: number, intensity: string, dryRun = true) {
   return request<FaultJob>(`${BASE}/simulate/fault/${faultType}`, {
     method: "POST",
-    body: JSON.stringify({ fault_type: faultType, duration_seconds: durationSeconds, intensity, dry_run: true }),
+    body: JSON.stringify({ fault_type: faultType, duration_seconds: durationSeconds, intensity, dry_run: dryRun }),
   });
+}
+
+export function fetchSentinelFaultJob(jobId: string) {
+  return request<FaultJob>(`${BASE}/simulate/fault/${jobId}/status`);
 }
 
 export function fetchSentinelModelMetrics() {

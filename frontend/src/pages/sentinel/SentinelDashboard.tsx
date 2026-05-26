@@ -27,11 +27,12 @@ import {
   SentinelMetricPoint,
   SentinelPrediction,
   SentinelQuerySample,
+  SentinelStatus,
   ShapResponse,
   explainSentinelCurrent,
-  explainSentinelIncident,
   fetchSentinelFaults,
   fetchSentinelEngines,
+  fetchSentinelFaultJob,
   fetchSentinelIncidentEvidence,
   fetchSentinelIncidents,
   fetchSentinelLiveMetrics,
@@ -39,8 +40,11 @@ import {
   fetchSentinelModelMetrics,
   fetchSentinelQueries,
   fetchSentinelShap,
+  fetchSentinelStatus,
   predictSentinelIncident,
   resolveSentinelIncident,
+  simulateSentinelFault,
+  triggerSentinelCollection,
 } from "../../api/sentinel";
 import { FaultInjector } from "../../components/sentinel/FaultInjector";
 import { IncidentCard } from "../../components/sentinel/IncidentCard";
@@ -74,8 +78,32 @@ function metricFrom(group: unknown, split: string, key: string) {
   return typeof value === "number" ? value.toFixed(3) : "-";
 }
 
+function labModeLabel(value?: string | null) {
+  if (value === "azure_demo") return "Azure lab";
+  if (value === "local_lab") return "Local Docker";
+  if (value === "not_configured") return "Sin monitor DB";
+  return value ?? "-";
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function hasPredictedIncident(prediction: SentinelPrediction | null) {
+  return Boolean(
+    prediction &&
+    (prediction.has_predicted_incident || prediction.risk_score >= 0.7) &&
+    prediction.risk_score > 0
+  );
+}
+
+function isRealIncident(incident: SentinelIncident) {
+  return Boolean(incident.incident_type && incident.incident_type !== "none" && (incident.risk_score ?? 0) > 0);
+}
+
 export function SentinelDashboard() {
   const [section, setSection] = useState<SentinelSection>("overview");
+  const [status, setStatus] = useState<SentinelStatus | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<SentinelLiveMetrics | null>(null);
   const [history, setHistory] = useState<SentinelMetricPoint[]>([]);
   const [queries, setQueries] = useState<SentinelQuerySample[]>([]);
@@ -91,12 +119,16 @@ export function SentinelDashboard() {
   const [faultJob, setFaultJob] = useState<FaultJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [copilotLoading, setCopilotLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   async function refresh() {
     setLoading(true);
     setError(null);
+    const statusResult = await Promise.allSettled([fetchSentinelStatus()]);
+    const statusValue = settledValue(statusResult[0], null);
+    const databaseName = statusValue?.monitor_database_name ?? liveMetrics?.database_name ?? "core_banking_sim";
     const [
       liveResult,
       historyResult,
@@ -111,7 +143,7 @@ export function SentinelDashboard() {
       fetchSentinelLiveMetrics(),
       fetchSentinelMetricsHistory(120),
       fetchSentinelQueries(45),
-      predictSentinelIncident(),
+      predictSentinelIncident(databaseName),
       fetchSentinelIncidents({ status: "all", limit: 12, since_hours: 24 * 30 }),
       fetchSentinelModelMetrics(),
       fetchSentinelShap("predictor", 18),
@@ -119,13 +151,20 @@ export function SentinelDashboard() {
       fetchSentinelEngines(),
     ]);
 
+    setStatus(statusValue);
     setLiveMetrics(settledValue(liveResult, null));
     setHistory(settledValue(historyResult, []));
     setQueries(settledValue(queryResult, []));
-    setPrediction(settledValue(predictionResult, null));
-    const incidentList = settledValue(incidentsResult, { incidents: [], total: 0, limit: 0, offset: 0 }).incidents;
+    const nextPrediction = settledValue(predictionResult, null);
+    setPrediction(nextPrediction);
+    if (!hasPredictedIncident(nextPrediction)) setCopilot(null);
+    const incidentList = settledValue(incidentsResult, { incidents: [], total: 0, limit: 0, offset: 0 }).incidents
+      .filter(isRealIncident);
     setIncidents(incidentList);
-    setSelectedIncident((current) => current ?? incidentList[0] ?? null);
+    setSelectedIncident((current) => {
+      if (current && incidentList.some((incident) => incident.id === current.id)) return current;
+      return incidentList[0] ?? null;
+    });
     setModelMetrics(settledValue(modelResult, null));
     setPredictorShap(settledValue(shapResult, null));
     setFaults(settledValue(faultsResult, { faults: [] }).faults);
@@ -142,6 +181,7 @@ export function SentinelDashboard() {
       shapResult,
       faultsResult,
       enginesResult,
+      statusResult[0],
     ].find((item) => item.status === "rejected");
     if (rejected?.status === "rejected") setError("Algunos endpoints Sentinel no respondieron en este refresh.");
     setLoading(false);
@@ -172,15 +212,61 @@ export function SentinelDashboard() {
   }, [selectedIncident?.id]);
 
   async function generateCopilot() {
+    if (!hasPredictedIncident(prediction)) {
+      setCopilot(null);
+      return;
+    }
     setCopilotLoading(true);
     setError(null);
     try {
-      const result = selectedIncident ? await explainSentinelIncident(selectedIncident.id) : await explainSentinelCurrent();
+      const result = await explainSentinelCurrent({
+        databaseName: status?.monitor_database_name ?? liveMetrics?.database_name ?? undefined,
+        persistIncident: false,
+      });
       setCopilot(result);
     } catch {
       setError("No se pudo generar el diagnóstico DBA Copilot.");
     } finally {
       setCopilotLoading(false);
+    }
+  }
+
+  async function runControlledDemo(faultType: string, durationSeconds: number, intensity: string) {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      const job = await simulateSentinelFault(faultType, durationSeconds, intensity, false);
+      setFaultJob(job);
+      let detected = false;
+      for (const delay of [12_000, 15_000, 15_000, 15_000]) {
+        await wait(delay);
+        const latestJob = await fetchSentinelFaultJob(job.job_id).catch(() => null);
+        if (latestJob) setFaultJob(latestJob);
+        const collected = await triggerSentinelCollection();
+        setLiveMetrics(collected.sample);
+        const [nextHistory, nextQueries] = await Promise.all([
+          fetchSentinelMetricsHistory(120),
+          fetchSentinelQueries(45),
+        ]);
+        setHistory(nextHistory);
+        setQueries(nextQueries);
+        const databaseName = status?.monitor_database_name ?? collected.sample.database_name ?? "core_banking_sim";
+        const nextPrediction = await predictSentinelIncident(databaseName);
+        setPrediction(nextPrediction);
+        if (hasPredictedIncident(nextPrediction)) {
+          const response = await explainSentinelCurrent({ databaseName, persistIncident: true });
+          setCopilot(response);
+          detected = true;
+          break;
+        }
+        setCopilot(null);
+      }
+      if (!detected) setError("La demo se ejecutó, pero el modelo todavía no elevó riesgo. Espera una muestra más o usa intensidad high.");
+      await refresh();
+    } catch {
+      setError("No se pudo completar el flujo controlado del lab.");
+    } finally {
+      setDemoLoading(false);
     }
   }
 
@@ -193,7 +279,9 @@ export function SentinelDashboard() {
 
   const currentMetrics = prediction?.current_metrics ?? {};
   const openIncidents = incidents.filter((incident) => incident.status === "open");
-  const healthTone = prediction?.has_predicted_incident ? "critical" : "low";
+  const predictionHasIncident = hasPredictedIncident(prediction);
+  const healthTone = predictionHasIncident ? "critical" : "stable";
+  const monitoredDatabase = status?.monitor_database_name ?? liveMetrics?.database_name ?? "core_banking_sim";
 
   return (
     <div className="sentinel-dashboard">
@@ -202,10 +290,10 @@ export function SentinelDashboard() {
           <p className="eyebrow">DB Sentinel AI</p>
           <h2>
             <ShieldCheck size={22} />
-            PostgreSQL · core_banking_sim
+            PostgreSQL · {monitoredDatabase}
           </h2>
           <p className="sentinel-subtitle">
-            Predictor {modelMetrics?.predictor.model_version ?? "1.0.0"} · RCA {modelMetrics?.rca.model_version ?? "1.0.0"}
+            {labModeLabel(status?.monitor_lab_mode)} · Guarda en {status?.storage_database_name ?? "cloudapp"} · Predictor {modelMetrics?.predictor.model_version ?? "1.0.0"} · RCA {modelMetrics?.rca.model_version ?? "1.0.0"}
             {lastRefresh ? ` · ${lastRefresh.toLocaleTimeString()}` : ""}
           </p>
         </div>
@@ -242,12 +330,15 @@ export function SentinelDashboard() {
         })}
       </nav>
 
+      <SentinelStatusPanel status={status} />
+
       {section === "overview" && (
         <OverviewSection
           liveMetrics={liveMetrics}
           currentMetrics={currentMetrics}
           history={history}
           prediction={prediction}
+          predictionHasIncident={predictionHasIncident}
           queries={queries}
           openIncidents={openIncidents}
           copilot={copilot}
@@ -271,7 +362,13 @@ export function SentinelDashboard() {
       )}
 
       {section === "simulate" && (
-        <SimulationSection faults={faults} job={faultJob} onJob={setFaultJob} />
+        <SimulationSection
+          faults={faults}
+          job={faultJob}
+          demoLoading={demoLoading}
+          onJob={setFaultJob}
+          onDemoRun={runControlledDemo}
+        />
       )}
 
       {section === "evaluate" && (
@@ -281,11 +378,55 @@ export function SentinelDashboard() {
   );
 }
 
+function SentinelStatusPanel({ status }: { status: SentinelStatus | null }) {
+  const modelStatus = status?.predictor.loaded && status.rca.loaded ? "loaded" : "attention";
+  const collectorStatus = status?.auto_collect_enabled ? (status.collector_running ? "running" : "configured") : "manual";
+  const lastCollected = status?.last_collected_at ? new Date(status.last_collected_at).toLocaleString() : "-";
+
+  return (
+    <section className="sentinel-status-grid">
+      <div className="panel sentinel-status-card">
+        <div>
+          <span>Base monitoreada</span>
+          <strong>{status?.monitor_database_name ?? "-"}</strong>
+          <small>{labModeLabel(status?.monitor_lab_mode)}</small>
+        </div>
+        <SeverityBadge value={status?.monitor_database_configured ? "low" : "medium"} />
+      </div>
+      <div className="panel sentinel-status-card">
+        <div>
+          <span>Recolector</span>
+          <strong>{collectorStatus}</strong>
+          <small>{status?.collector_interval_seconds ?? "-"}s · {lastCollected}</small>
+        </div>
+        <SeverityBadge value={status?.collector_running ? "stable" : "medium"} />
+      </div>
+      <div className="panel sentinel-status-card">
+        <div>
+          <span>Muestras</span>
+          <strong>{formatNumber(status?.total_samples ?? 0)}</strong>
+          <small>{formatNumber(status?.query_samples ?? 0)} query samples</small>
+        </div>
+        <SeverityBadge value={(status?.total_samples ?? 0) > 0 ? "stable" : "medium"} />
+      </div>
+      <div className="panel sentinel-status-card">
+        <div>
+          <span>Modelos ML</span>
+          <strong>{modelStatus}</strong>
+          <small>Predictor {status?.predictor.feature_count ?? "-"} · RCA {status?.rca.feature_count ?? "-"}</small>
+        </div>
+        <SeverityBadge value={modelStatus === "loaded" ? "stable" : "medium"} />
+      </div>
+    </section>
+  );
+}
+
 function OverviewSection({
   liveMetrics,
   currentMetrics,
   history,
   prediction,
+  predictionHasIncident,
   queries,
   openIncidents,
   copilot,
@@ -297,6 +438,7 @@ function OverviewSection({
   currentMetrics: Record<string, number>;
   history: SentinelMetricPoint[];
   prediction: SentinelPrediction | null;
+  predictionHasIncident: boolean;
   queries: SentinelQuerySample[];
   openIncidents: SentinelIncident[];
   copilot: CopilotResponse | null;
@@ -332,8 +474,8 @@ function OverviewSection({
       </section>
 
       <section className="sentinel-main-grid">
-        <RootCausePanel causes={prediction?.rca_top_causes ?? []} />
-        <RecommendationPanel copilot={copilot} loading={copilotLoading} onGenerate={onGenerateCopilot} />
+        <RootCausePanel causes={prediction?.rca_top_causes ?? []} active={predictionHasIncident} />
+        <RecommendationPanel copilot={copilot} loading={copilotLoading} active={predictionHasIncident} onGenerate={onGenerateCopilot} />
       </section>
 
       <section className="sentinel-main-grid">
@@ -343,7 +485,7 @@ function OverviewSection({
             <span>{openIncidents.length}</span>
           </div>
           <div className="sentinel-card-list">
-            {openIncidents.length === 0 && <p className="sentinel-muted">No hay incidentes abiertos.</p>}
+            {openIncidents.length === 0 && <p className="sentinel-muted">No hay incidentes reales abiertos.</p>}
             {openIncidents.slice(0, 5).map((incident) => (
               <IncidentCard key={incident.id} incident={incident} onSelect={onSelectIncident} />
             ))}
@@ -360,15 +502,15 @@ function QueryFingerprintTable({ queries }: { queries: SentinelQuerySample[] }) 
   return (
     <div className="panel sentinel-query-panel">
       <div className="panel-heading">
-        <h2>Query fingerprints</h2>
+        <h2>Query fingerprints recientes</h2>
         <span>{queries.length}</span>
       </div>
       <div className="sentinel-query-table">
         <div className="sentinel-query-row header">
           <span>Query</span>
           <span>Mean ms</span>
-          <span>Calls</span>
-          <span>WAL</span>
+          <span>Calls Δ</span>
+          <span>WAL Δ</span>
         </div>
         {queries.slice(0, 8).map((query, index) => (
           <div className="sentinel-query-row" key={`${query.queryid ?? index}-${index}`}>
@@ -404,7 +546,7 @@ function IncidentsSection({
           <span>{incidents.length}</span>
         </div>
         <div className="sentinel-card-list">
-          {incidents.length === 0 && <p className="sentinel-muted">Sin incidentes registrados.</p>}
+          {incidents.length === 0 && <p className="sentinel-muted">Sin incidentes reales registrados.</p>}
           {incidents.map((incident) => (
             <IncidentCard
               key={incident.id}
@@ -420,14 +562,14 @@ function IncidentsSection({
         {!selectedIncident && (
           <section className="panel sentinel-empty-state">
             <FileText size={26} />
-            <p>Selecciona un incidente.</p>
+            <p>Selecciona un incidente real.</p>
           </section>
         )}
         {selectedIncident && (
           <>
             <section className="panel sentinel-detail-head">
               <div>
-                <p className="eyebrow">Incident #{selectedIncident.id}</p>
+                <p className="eyebrow">Incidente #{selectedIncident.id}</p>
                 <h2>{(selectedIncident.incident_type ?? "unknown").replace(/_/g, " ")}</h2>
                 <p>{selectedIncident.database_name ?? "core_banking_sim"} · {new Date(selectedIncident.detected_at).toLocaleString()}</p>
               </div>
@@ -441,7 +583,7 @@ function IncidentsSection({
                 )}
               </div>
             </section>
-            <RootCausePanel causes={selectedIncident.root_cause_top3 ?? evidence?.root_cause_top3 ?? []} />
+            <RootCausePanel causes={selectedIncident.root_cause_top3 ?? evidence?.root_cause_top3 ?? []} active title="RCA del incidente" />
             <MetricsTimeline points={evidence?.metrics_timeline ?? []} />
             <QueryFingerprintTable queries={evidence?.slow_queries ?? []} />
           </>
@@ -451,22 +593,43 @@ function IncidentsSection({
   );
 }
 
-function SimulationSection({ faults, job, onJob }: { faults: FaultType[]; job: FaultJob | null; onJob: (job: FaultJob) => void }) {
+function SimulationSection({
+  faults,
+  job,
+  demoLoading,
+  onJob,
+  onDemoRun,
+}: {
+  faults: FaultType[];
+  job: FaultJob | null;
+  demoLoading: boolean;
+  onJob: (job: FaultJob) => void;
+  onDemoRun: (faultType: string, durationSeconds: number, intensity: string) => Promise<void>;
+}) {
   return (
     <section className="sentinel-main-grid">
-      <FaultInjector faults={faults} onJob={onJob} />
+      <FaultInjector faults={faults} onJob={onJob} onDemoRun={onDemoRun} />
       <div className="panel sentinel-job-panel">
         <div className="panel-heading">
-          <h2>Último dry-run</h2>
+          <h2>Último flujo</h2>
           {job && <SeverityBadge value={job.status} />}
         </div>
         {!job && <p className="sentinel-muted">Sin simulación preparada.</p>}
+        {demoLoading && <p className="sentinel-muted">Recolectando métricas, prediciendo riesgo y preparando diagnóstico.</p>}
         {job && (
           <div className="sentinel-job-body">
             <strong>{job.fault_type.replace(/_/g, " ")}</strong>
             <ul>
               {job.plan.map((item) => <li key={item}>{item}</li>)}
             </ul>
+            {job.processes && job.processes.length > 0 && (
+              <div className="sentinel-process-list">
+                {job.processes.map((process) => (
+                  <span key={`${process.name}-${process.pid}`}>{process.name} · PID {process.pid}</span>
+                ))}
+              </div>
+            )}
+            {job.error && <p className="sentinel-muted">{job.error}</p>}
             {job.command && <pre>{job.command}</pre>}
           </div>
         )}

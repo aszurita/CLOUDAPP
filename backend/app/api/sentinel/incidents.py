@@ -30,7 +30,12 @@ def list_incidents(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     since = datetime.now(timezone.utc) - timedelta(hours=since_hours)
-    query = db.query(SentinelIncident).filter(SentinelIncident.detected_at >= since)
+    query = db.query(SentinelIncident).filter(
+        SentinelIncident.detected_at >= since,
+        SentinelIncident.incident_type.isnot(None),
+        SentinelIncident.incident_type != "none",
+        SentinelIncident.risk_score > 0,
+    )
     if status and status != "all":
         query = query.filter(SentinelIncident.status == status)
 

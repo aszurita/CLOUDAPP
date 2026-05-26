@@ -78,6 +78,7 @@ from app.services.audit import record_audit_event
 from app.services.autopilot import AutopilotService
 from app.services.catalog import CatalogGovernanceService
 from app.services.dataops import DEFAULT_PIPELINE_KEY, DataOpsMonitorService
+from app.services.database_inventory import collect_database_inventory
 from app.services.dba import DbaCopilotService
 from app.services.query_governance import QueryGovernanceEngine
 
@@ -209,6 +210,11 @@ def query_policies(db: Session = Depends(get_db)) -> list[QueryPolicy]:
     return db.query(QueryPolicy).filter(QueryPolicy.enabled.is_(True)).order_by(QueryPolicy.id).all()
 
 
+@router.get("/query-governance/metadata")
+def query_metadata() -> dict[str, Any]:
+    return collect_database_inventory()
+
+
 @router.get("/query-governance/demo-queries", response_model=DemoQueriesResponse)
 def demo_queries() -> DemoQueriesResponse:
     return DemoQueriesResponse(
@@ -249,6 +255,16 @@ def dba_tables(db: Session = Depends(get_db)) -> list[DbaTableProfile]:
 @router.get("/dba/recommendations", response_model=list[DbaRecommendationRead])
 def dba_recommendations(db: Session = Depends(get_db)) -> list[DbaRecommendation]:
     return db.query(DbaRecommendation).order_by(DbaRecommendation.created_at.desc()).limit(30).all()
+
+
+@router.get("/dba/sources")
+def dba_sources() -> dict[str, Any]:
+    return collect_database_inventory()
+
+
+@router.get("/database/inventory")
+def database_inventory() -> dict[str, Any]:
+    return collect_database_inventory()
 
 
 @router.post("/dataops/pipelines/run", response_model=DataOpsPipelineRunRead)

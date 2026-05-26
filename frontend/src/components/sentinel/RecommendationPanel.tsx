@@ -7,10 +7,11 @@ import { SeverityBadge } from "./SeverityBadge";
 type Props = {
   copilot: CopilotResponse | null;
   loading: boolean;
+  active: boolean;
   onGenerate: () => void;
 };
 
-export function RecommendationPanel({ copilot, loading, onGenerate }: Props) {
+export function RecommendationPanel({ copilot, loading, active, onGenerate }: Props) {
   const [copied, setCopied] = useState<number | null>(null);
 
   async function copySql(sql: string, index: number) {
@@ -23,9 +24,16 @@ export function RecommendationPanel({ copilot, loading, onGenerate }: Props) {
     <section className="panel sentinel-copilot-panel">
       <div className="panel-heading">
         <h2>DBA Copilot</h2>
-        {copilot ? <SeverityBadge value={copilot.severity_classification} /> : <ShieldCheck size={18} />}
+        {active && copilot ? <SeverityBadge value={copilot.severity_classification} /> : <SeverityBadge value={active ? "medium" : "stable"} />}
       </div>
-      {!copilot && (
+      {!active && (
+        <div className="sentinel-stable-state">
+          <ShieldCheck size={22} />
+          <strong>Sin diagnóstico crítico</strong>
+          <p>El Copilot queda en espera porque la predicción actual no marca un incidente.</p>
+        </div>
+      )}
+      {active && !copilot && (
         <div className="sentinel-empty-action">
           <p>Briefing no generado para esta ventana.</p>
           <button className="primary" onClick={onGenerate} disabled={loading}>
@@ -34,7 +42,7 @@ export function RecommendationPanel({ copilot, loading, onGenerate }: Props) {
           </button>
         </div>
       )}
-      {copilot && (
+      {active && copilot && (
         <div className="sentinel-copilot-body">
           <p className="sentinel-summary">{copilot.incident_summary}</p>
           <p className="sentinel-impact">{copilot.impact_description}</p>

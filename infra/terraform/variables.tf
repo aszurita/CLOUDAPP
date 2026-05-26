@@ -130,6 +130,37 @@ variable "dataops_pipelines_json" {
   default     = ""
 }
 
+variable "sentinel_monitor_db_url" {
+  type        = string
+  description = "Optional PostgreSQL URL monitored by DB Sentinel AI, for example the lab database."
+  sensitive   = true
+  default     = ""
+}
+
+variable "sentinel_monitor_database_name" {
+  type        = string
+  description = "Display/name filter used by Sentinel for the monitored database."
+  default     = "core_banking_sim"
+}
+
+variable "sentinel_enable_auto_collect" {
+  type        = bool
+  description = "Enable Sentinel collector loop inside the backend Container App."
+  default     = false
+}
+
+variable "sentinel_collect_interval_seconds" {
+  type        = number
+  description = "Seconds between automatic Sentinel collection cycles."
+  default     = 60
+}
+
+variable "sentinel_risk_threshold" {
+  type        = number
+  description = "Risk score threshold used to persist Sentinel incidents."
+  default     = 0.70
+}
+
 variable "purview_endpoint" {
   type        = string
   description = "Optional Microsoft Purview endpoint for enterprise catalog mode."

@@ -76,6 +76,49 @@ export type DemoQueries = {
   safe: string;
 };
 
+export type DatabaseColumnMetadata = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  sensitive: boolean;
+};
+
+export type DatabaseTableMetadata = {
+  name: string;
+  schema_name: string;
+  qualified_name: string;
+  column_count: number;
+  columns: DatabaseColumnMetadata[];
+  allowed_query: boolean;
+  internal: boolean;
+  source_role: string;
+};
+
+export type DatabaseSchemaMetadata = {
+  name: string;
+  tables: DatabaseTableMetadata[];
+};
+
+export type DatabaseSourceMetadata = {
+  key: string;
+  label: string;
+  role: string;
+  engine: string;
+  host: string | null;
+  database_name: string;
+  lab_mode: string;
+  status: string;
+  error: string | null;
+  table_count: number;
+  queryable_table_count: number;
+  schemas: DatabaseSchemaMetadata[];
+};
+
+export type DatabaseInventory = {
+  environment: string;
+  sources: DatabaseSourceMetadata[];
+};
+
 export type DbaAnalyzeResponse = {
   profiles_count: number;
   recommendations_count: number;
@@ -419,6 +462,10 @@ export function getQueryHistory() {
   return request<QueryReview[]>("/api/query-governance/history");
 }
 
+export function getQueryMetadata() {
+  return request<DatabaseInventory>("/api/query-governance/metadata");
+}
+
 export function analyzeQuery(sql: string) {
   return request<QueryAnalyzeResponse>("/api/query-governance/analyze", {
     method: "POST",
@@ -443,6 +490,14 @@ export function getDbaTables() {
 
 export function getDbaRecommendations() {
   return request<DbaRecommendation[]>("/api/dba/recommendations");
+}
+
+export function getDbaSources() {
+  return request<DatabaseInventory>("/api/dba/sources");
+}
+
+export function getDatabaseInventory() {
+  return request<DatabaseInventory>("/api/database/inventory");
 }
 
 function encodeDataOpsKey(pipelineKey: string) {

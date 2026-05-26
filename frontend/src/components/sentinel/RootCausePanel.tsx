@@ -2,15 +2,24 @@ import type { RootCause } from "../../api/sentinel";
 
 type Props = {
   causes: RootCause[];
+  active?: boolean;
+  title?: string;
 };
 
-export function RootCausePanel({ causes }: Props) {
+export function RootCausePanel({ causes, active = true, title = "RCA causa probable" }: Props) {
   return (
     <section className="panel sentinel-root-panel">
       <div className="panel-heading">
-        <h2>RCA Top causas</h2>
-        <span>{causes.length}</span>
+        <h2>{title}</h2>
+        <span>{active ? causes.length : "en espera"}</span>
       </div>
+      {!active && (
+        <div className="sentinel-stable-state">
+          <strong>Sin causa raíz activa</strong>
+          <p>El predictor no detecta un incidente; las causas RCA se muestran cuando existe riesgo real.</p>
+        </div>
+      )}
+      {active && (
       <div className="sentinel-cause-list">
         {causes.length === 0 && <p className="sentinel-muted">Sin causas rankeadas en esta ventana.</p>}
         {causes.map((cause) => (
@@ -33,6 +42,7 @@ export function RootCausePanel({ causes }: Props) {
           </article>
         ))}
       </div>
+      )}
     </section>
   );
 }

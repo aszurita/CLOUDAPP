@@ -161,5 +161,9 @@ class FaultJobResponse(BaseModel):
     duration_seconds: int
     intensity: str
     started_at: str
+    finished_at: Optional[str] = None
     plan: list[str]
     command: Optional[str] = None
+    processes: list[dict[str, Any]] = []
+    logs: list[dict[str, Any]] = []
+    error: Optional[str] = None

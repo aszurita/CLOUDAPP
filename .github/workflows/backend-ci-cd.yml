@@ -47,6 +47,11 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           DATABRICKS_JOB_ID: ${{ secrets.DATABRICKS_JOB_ID }}
           DATAOPS_PIPELINES_JSON: ${{ secrets.DATAOPS_PIPELINES_JSON }}
+          SENTINEL_MONITOR_DB_URL: ${{ secrets.SENTINEL_MONITOR_DB_URL }}
+          SENTINEL_MONITOR_DATABASE_NAME: ${{ secrets.SENTINEL_MONITOR_DATABASE_NAME }}
+          SENTINEL_ENABLE_AUTO_COLLECT: ${{ secrets.SENTINEL_ENABLE_AUTO_COLLECT }}
+          SENTINEL_COLLECT_INTERVAL_SECONDS: ${{ secrets.SENTINEL_COLLECT_INTERVAL_SECONDS }}
+          SENTINEL_RISK_THRESHOLD: ${{ secrets.SENTINEL_RISK_THRESHOLD }}
         run: |
           test -n "$AZURE_CREDENTIALS" || (echo "Missing GitHub secret: AZURE_CREDENTIALS" && exit 1)
           test -n "$AZURE_RESOURCE_GROUP" || (echo "Missing GitHub secret: AZURE_RESOURCE_GROUP" && exit 1)
@@ -63,6 +68,10 @@ jobs:
           fi
           if [ -n "$DATAOPS_PIPELINES_JSON" ]; then
             python -m json.tool <<< "$DATAOPS_PIPELINES_JSON" > /dev/null || (echo "DATAOPS_PIPELINES_JSON is not valid JSON" && exit 1)
+          fi
+          if [ -n "$SENTINEL_COLLECT_INTERVAL_SECONDS" ] && ! [[ "$SENTINEL_COLLECT_INTERVAL_SECONDS" =~ ^[0-9]+$ ]]; then
+            echo "SENTINEL_COLLECT_INTERVAL_SECONDS must be numeric."
+            exit 1
           fi
       - uses: azure/login@v2
         with:
@@ -81,11 +90,18 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           DATABRICKS_JOB_ID: ${{ secrets.DATABRICKS_JOB_ID }}
+          SENTINEL_MONITOR_DB_URL: ${{ secrets.SENTINEL_MONITOR_DB_URL }}
         run: |
           az containerapp secret set \
             --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --secrets openai-api-key="${{ secrets.OPENAI_API_KEY }}"
+          if [ -n "$SENTINEL_MONITOR_DB_URL" ]; then
+            az containerapp secret set \
+              --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --secrets sentinel-monitor-db-url="$SENTINEL_MONITOR_DB_URL"
+          fi
           if [ -n "$DATABRICKS_TOKEN" ]; then
             az containerapp secret set \
               --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
@@ -97,6 +113,11 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_JOB_ID: ${{ secrets.DATABRICKS_JOB_ID }}
           DATAOPS_PIPELINES_JSON: ${{ secrets.DATAOPS_PIPELINES_JSON }}
+          SENTINEL_MONITOR_DB_URL: ${{ secrets.SENTINEL_MONITOR_DB_URL }}
+          SENTINEL_MONITOR_DATABASE_NAME: ${{ secrets.SENTINEL_MONITOR_DATABASE_NAME }}
+          SENTINEL_ENABLE_AUTO_COLLECT: ${{ secrets.SENTINEL_ENABLE_AUTO_COLLECT }}
+          SENTINEL_COLLECT_INTERVAL_SECONDS: ${{ secrets.SENTINEL_COLLECT_INTERVAL_SECONDS }}
+          SENTINEL_RISK_THRESHOLD: ${{ secrets.SENTINEL_RISK_THRESHOLD }}
         run: |
           az containerapp update \
             --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
@@ -114,6 +135,22 @@ jobs:
                 DATABRICKS_HOST="$DATABRICKS_HOST" \
                 DATABRICKS_TOKEN=secretref:databricks-token \
                 DATABRICKS_JOB_ID="$DATABRICKS_JOB_ID"
+          fi
+          if [ -n "$SENTINEL_MONITOR_DB_URL" ]; then
+            az containerapp update \
+              --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars \
+                SENTINEL_MONITOR_DB_URL=secretref:sentinel-monitor-db-url \
+                SENTINEL_ENABLE_AUTO_COLLECT="${SENTINEL_ENABLE_AUTO_COLLECT:-true}" \
+                SENTINEL_COLLECT_INTERVAL_SECONDS="${SENTINEL_COLLECT_INTERVAL_SECONDS:-60}" \
+                SENTINEL_RISK_THRESHOLD="${SENTINEL_RISK_THRESHOLD:-0.70}"
+          fi
+          if [ -n "$SENTINEL_MONITOR_DATABASE_NAME" ]; then
+            az containerapp update \
+              --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars SENTINEL_MONITOR_DATABASE_NAME="$SENTINEL_MONITOR_DATABASE_NAME"
           fi
           if [ -n "$DATAOPS_PIPELINES_JSON" ]; then
             az containerapp update \

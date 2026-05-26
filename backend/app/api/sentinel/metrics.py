@@ -7,6 +7,7 @@ import asyncio
 import logging
 from contextlib import suppress
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +17,10 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.schemas.sentinel_schemas import LiveMetricsResponse
+from app.services.database_inventory import database_name_from_url, lab_mode_from_url, sentinel_database_name
 from app.services.sentinel.collector_service import PostgresCollector
+from app.services.sentinel.model_service import IncidentPredictorService
+from app.services.sentinel.rca_service import RootCauseService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,7 +43,7 @@ def _get_collector() -> PostgresCollector:
             monitor_dsn=settings.sentinel_monitor_db_url,
             storage_dsn=settings.database_url,
             interval_seconds=settings.sentinel_collect_interval_seconds,
-            database_name="core_banking_sim",
+            database_name=sentinel_database_name(settings),
         )
     return _collector
 
@@ -90,7 +94,35 @@ def collect_status() -> dict[str, Any]:
         "running": _collector is not None and _collector._running,
         "interval_seconds": settings.sentinel_collect_interval_seconds,
         "monitor_db_configured": bool(settings.sentinel_monitor_db_url),
+        "monitor_database_name": sentinel_database_name(settings),
+        "monitor_lab_mode": lab_mode_from_url(settings.sentinel_monitor_db_url),
         "auto_collect_enabled": settings.sentinel_enable_auto_collect,
+    }
+
+
+@router.get("/status", summary="Estado integral de DB Sentinel AI")
+def sentinel_status(db: Session = Depends(get_db)) -> dict[str, Any]:
+    total = db.execute(text("SELECT COUNT(*) FROM sentinel_metric_samples")).scalar()
+    last = db.execute(text("SELECT collected_at FROM sentinel_metric_samples ORDER BY collected_at DESC LIMIT 1")).scalar()
+    query_total = db.execute(text("SELECT COUNT(*) FROM sentinel_query_samples")).scalar()
+    incident_total = db.execute(text("SELECT COUNT(*) FROM sentinel_incidents")).scalar()
+    return {
+        "environment": settings.environment,
+        "storage_database_name": database_name_from_url(settings.database_url, "cloudapp"),
+        "monitor_database_configured": bool(settings.sentinel_monitor_db_url),
+        "monitor_database_name": sentinel_database_name(settings),
+        "monitor_lab_mode": lab_mode_from_url(settings.sentinel_monitor_db_url),
+        "auto_collect_enabled": settings.sentinel_enable_auto_collect,
+        "collector_initialized": _collector is not None,
+        "collector_running": _collector is not None and _collector._running,
+        "collector_interval_seconds": settings.sentinel_collect_interval_seconds,
+        "risk_threshold": settings.sentinel_risk_threshold,
+        "total_samples": int(total or 0),
+        "query_samples": int(query_total or 0),
+        "incidents_total": int(incident_total or 0),
+        "last_collected_at": last.isoformat() if last else None,
+        "predictor": _predictor_status(),
+        "rca": _rca_status(),
     }
 
 
@@ -171,3 +203,25 @@ def get_metrics_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
         "last_collected_at": last.isoformat() if last else None,
         "collector_interval_seconds": settings.sentinel_collect_interval_seconds,
     }
+
+
+def _predictor_status() -> dict[str, Any]:
+    path = Path(settings.sentinel_model_path)
+    status = {"configured_path": str(path), "path_exists": path.exists(), "loaded": False, "model_version": None, "error": None}
+    try:
+        predictor = IncidentPredictorService.get_instance(settings.sentinel_model_path, settings.sentinel_feature_schema_path)
+        status.update({"loaded": True, "model_version": predictor.model_version, "feature_count": len(predictor.feature_cols)})
+    except Exception as exc:
+        status["error"] = str(exc)
+    return status
+
+
+def _rca_status() -> dict[str, Any]:
+    path = Path(settings.sentinel_rca_model_path)
+    status = {"configured_path": str(path), "path_exists": path.exists(), "loaded": False, "model_version": None, "error": None}
+    try:
+        rca = RootCauseService.get_instance(settings.sentinel_rca_model_path)
+        status.update({"loaded": True, "model_version": rca.model_version, "feature_count": len(rca.feature_cols)})
+    except Exception as exc:
+        status["error"] = str(exc)
+    return status
