@@ -101,6 +101,28 @@ class AIRecommendationService:
             },
         )
 
+    def generate_gold_table_plan(self, request_context: dict[str, Any]) -> str:
+        system_prompt = (
+            "Eres un arquitecto DataOps para Databricks Lakehouse. Convierte una necesidad de negocio "
+            "en una propuesta segura para crear o reutilizar una tabla/vista Gold. Responde solo JSON valido, "
+            "sin markdown. Usa exclusivamente las tablas y columnas del catalogo recibido. "
+            "El campo source_sql debe ser un SELECT de Databricks SQL, nunca CREATE/INSERT/UPDATE/DELETE/DROP/ALTER. "
+            "Formato exacto: {\"decision\":\"CREATE_NEW_TABLE|CREATE_NEW_VIEW|REUSE_EXISTING\","
+            "\"object_type\":\"TABLE|VIEW\",\"target_catalog\":\"string\",\"target_schema\":\"string\","
+            "\"target_name\":\"snake_case\",\"source_tables\":[\"catalog.schema.table\"],"
+            "\"source_sql\":\"SELECT ...\",\"explanation\":\"string\",\"confidence\":0.0}."
+        )
+        return self._complete(
+            system_prompt,
+            {
+                "request_context": request_context,
+                "instruction": (
+                    "Analiza el prompt, prefiere fuentes Silver para crear Gold de reporting, "
+                    "reutiliza Gold si ya resuelve la solicitud y genera un SELECT validable."
+                ),
+            },
+        )
+
     def generate_catalog_documentation(self, asset_metadata: dict[str, Any]) -> str:
         system_prompt = (
             "Eres un data governance copilot. Documenta activos de datos en español usando solo metadata técnica. "

@@ -31,6 +31,243 @@ body {
   text-align: center;
 }
 
+.launcher-shell {
+  background:
+    linear-gradient(90deg, rgb(22 32 42 / 0.045) 1px, transparent 1px),
+    linear-gradient(0deg, rgb(22 32 42 / 0.045) 1px, transparent 1px),
+    #f4f7f9;
+  background-size: 42px 42px;
+  display: grid;
+  gap: 28px;
+  min-height: 100vh;
+  padding: 52px 32px;
+}
+
+.launcher-hero,
+.suite-grid {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1180px;
+  width: 100%;
+}
+
+.launcher-hero {
+  display: grid;
+  gap: 14px;
+  padding-top: 24px;
+}
+
+.launcher-brand,
+.launcher-status-row,
+.suite-card-head,
+.suite-chip-row,
+.suite-open {
+  align-items: center;
+  display: flex;
+}
+
+.launcher-brand {
+  color: #174d5f;
+  font-weight: 800;
+  gap: 10px;
+}
+
+.launcher-brand-mark,
+.suite-icon {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.launcher-brand-mark {
+  background: #174d5f;
+  color: #ffffff;
+}
+
+.launcher-hero h1 {
+  color: #16202a;
+  font-size: 3.25rem;
+  line-height: 1.04;
+  max-width: 780px;
+}
+
+.launcher-copy {
+  color: #4c6070;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 740px;
+}
+
+.launcher-status-row {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.launcher-status-row span,
+.suite-chip-row span,
+.suite-state {
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.launcher-status-row span {
+  background: #ffffff;
+  border-color: #d9e2e8;
+  color: #526270;
+}
+
+.suite-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1024px) {
+  .suite-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .suite-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.suite-card {
+  background: #ffffff;
+  border: 1px solid #d9e2e8;
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgb(22 32 42 / 0.09);
+  color: #263645;
+  cursor: pointer;
+  display: grid;
+  gap: 16px;
+  min-height: 380px;
+  padding: 28px;
+  text-align: left;
+  transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s;
+}
+
+.suite-card:hover {
+  border-color: #8fb7c7;
+  box-shadow: 0 22px 58px rgb(22 32 42 / 0.14);
+  transform: translateY(-2px);
+}
+
+.suite-card-head {
+  justify-content: space-between;
+}
+
+.suite-card-cloudops .suite-icon {
+  background: #e9f5f0;
+  color: #16745f;
+}
+
+.suite-card-database .suite-icon {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.suite-state {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #047857;
+}
+
+.suite-state-build {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.suite-state-beta {
+  background: #fdf4ff;
+  border-color: #e9d5ff;
+  color: #7e22ce;
+}
+
+.suite-card-factory .suite-icon {
+  background: #fdf4ff;
+  color: #7e22ce;
+}
+
+.suite-card-appfactory .suite-icon {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.suite-card-cloudautopilot .suite-icon {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.suite-kicker {
+  color: #637283;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.suite-card strong {
+  color: #16202a;
+  display: block;
+  font-size: 2rem;
+  line-height: 1.1;
+  max-width: 520px;
+}
+
+.suite-copy {
+  color: #526270;
+  display: block;
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: 560px;
+}
+
+.suite-chip-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suite-chip-row span {
+  background: #f8fbfc;
+  border-color: #dfe9ef;
+  color: #4c6070;
+}
+
+.suite-open {
+  color: #174d5f;
+  font-weight: 900;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.suite-switch {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd9e2;
+  border-radius: 8px;
+  color: #174d5f;
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
 .topbar {
   align-items: center;
   display: flex;
@@ -2247,6 +2484,309 @@ h3 {
   line-height: 1.45;
 }
 
+/* ── Core Banking dashboard ───────────────────────────── */
+
+.banking-dashboard {
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.banking-hero,
+.banking-hero-actions,
+.banking-live-pill,
+.banking-panel-title,
+.banking-status-row,
+.banking-table-row,
+.banking-account-row,
+.banking-activity-row {
+  align-items: center;
+  display: flex;
+}
+
+.banking-hero {
+  background:
+    linear-gradient(135deg, rgb(15 118 110 / 0.12), transparent 46%),
+    linear-gradient(115deg, rgb(37 99 235 / 0.10), transparent 52%),
+    #ffffff;
+  justify-content: space-between;
+  min-height: 148px;
+}
+
+.banking-hero h2 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: 0;
+  margin: 4px 0;
+}
+
+.banking-hero p {
+  color: #526270;
+}
+
+.banking-hero-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.banking-hero-actions button {
+  align-items: center;
+  background: #102f3a;
+  border: 1px solid #102f3a;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 12px;
+}
+
+.banking-hero-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.banking-live-pill {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  color: #047857;
+  font-weight: 800;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.banking-metric-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.banking-metric {
+  background: #ffffff;
+  border: 1px solid #d9e2e8;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgb(22 32 42 / 0.06);
+  display: flex;
+  gap: 12px;
+  min-height: 102px;
+  padding: 16px;
+}
+
+.banking-metric > span {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.banking-metric p {
+  color: #637283;
+  font-size: 0.8rem;
+}
+
+.banking-metric strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-top: 5px;
+}
+
+.banking-tone-blue > span {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.banking-tone-green > span {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.banking-tone-cyan > span {
+  background: #ecfeff;
+  color: #0891b2;
+}
+
+.banking-tone-amber > span {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.banking-tone-rose > span {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.banking-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.banking-wide {
+  grid-column: 1 / -1;
+}
+
+.banking-chart-panel {
+  min-height: 342px;
+}
+
+.banking-panel-title {
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.banking-panel-title h3 {
+  color: #102033;
+  font-size: 1.02rem;
+}
+
+.banking-panel-title span {
+  background: #f4f8fb;
+  border: 1px solid #dbe7ee;
+  border-radius: 999px;
+  color: #526270;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.banking-status-stack,
+.banking-table-list,
+.banking-account-list,
+.banking-activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.banking-status-row {
+  border: 1px solid #e2ebf1;
+  border-radius: 8px;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px;
+}
+
+.banking-status-row > span {
+  border-radius: 999px;
+  flex: 0 0 10px;
+  height: 34px;
+  width: 10px;
+}
+
+.banking-status-row div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.banking-status-row small,
+.banking-account-row span,
+.banking-activity-row small,
+.banking-footnote {
+  color: #637283;
+  font-size: 0.82rem;
+}
+
+.banking-sentinel-ring {
+  --score: 0%;
+  align-items: center;
+  background: conic-gradient(#0f766e var(--score), #e7eef3 0);
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  height: 170px;
+  justify-content: center;
+  margin: 26px auto 0;
+  position: relative;
+  width: 170px;
+}
+
+.banking-sentinel-ring::after {
+  background: #ffffff;
+  border-radius: inherit;
+  content: "";
+  inset: 14px;
+  position: absolute;
+}
+
+.banking-sentinel-ring span,
+.banking-sentinel-ring small {
+  position: relative;
+  z-index: 1;
+}
+
+.banking-sentinel-ring span {
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.banking-table-row {
+  border-top: 1px solid #e6edf1;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(210px, 1.5fr) repeat(3, minmax(120px, 0.6fr));
+  min-width: 720px;
+  padding: 12px 4px;
+}
+
+.banking-table-row > span:first-child {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.banking-table-list {
+  overflow-x: auto;
+}
+
+.banking-footnote {
+  background: #f8fbfc;
+  border: 1px solid #dfe9ef;
+  border-radius: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+}
+
+.banking-account-row,
+.banking-activity-row {
+  border-top: 1px solid #e6edf1;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 58px;
+  padding-top: 10px;
+}
+
+.banking-account-row div,
+.banking-activity-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.banking-account-row b,
+.banking-activity-row b {
+  white-space: nowrap;
+}
+
+.banking-activity-icon {
+  align-items: center;
+  background: #eef6ff;
+  border-radius: 8px;
+  color: #2563eb;
+  display: flex;
+  flex: 0 0 34px;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
 @media (max-width: 900px) {
   .sentinel-hero,
   .sentinel-detail-head,
@@ -2334,6 +2874,20 @@ h3 {
   .catalog-detail-grid {
     grid-template-columns: 1fr;
   }
+
+  .banking-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .banking-hero-actions {
+    justify-content: flex-start;
+  }
+
+  .banking-metric-grid,
+  .banking-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .spin {
@@ -2349,6 +2903,31 @@ h3 {
 @media (max-width: 900px) {
   .app-shell {
     padding: 20px;
+  }
+
+  .launcher-shell {
+    padding: 24px 18px;
+  }
+
+  .launcher-hero {
+    padding-top: 8px;
+  }
+
+  .launcher-hero h1 {
+    font-size: 2.25rem;
+  }
+
+  .suite-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .suite-card {
+    min-height: 310px;
+    padding: 22px;
+  }
+
+  .suite-card strong {
+    font-size: 1.65rem;
   }
 
   .topbar {

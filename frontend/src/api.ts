@@ -119,6 +119,79 @@ export type DatabaseInventory = {
   sources: DatabaseSourceMetadata[];
 };
 
+export type CoreBankingTableInventory = {
+  schema_name: string;
+  table_name: string;
+  estimated_rows: number;
+  size_bytes: number;
+  column_count: number;
+  last_analyze: string | null;
+  last_autoanalyze: string | null;
+  last_vacuum: string | null;
+  last_autovacuum: string | null;
+};
+
+export type CoreBankingTimelinePoint = {
+  bucket: string;
+  transactions: number;
+  amount: number;
+};
+
+export type CoreBankingMixItem = {
+  [key: string]: string | number | null | undefined;
+  records?: number;
+  amount?: number;
+};
+
+export type CoreBankingActivity = {
+  occurred_at: string | null;
+  activity_type: string;
+  activity_id: string;
+  account_id: number | null;
+  operation: string | null;
+  amount: number | null;
+  currency: string | null;
+  status: string | null;
+  channel: string | null;
+  reference: string | null;
+};
+
+export type CoreBankingTopAccount = {
+  account_id: number;
+  account_number: string;
+  account_type: string;
+  currency: string;
+  balance: number;
+  available_balance: number;
+  status: string;
+  full_name: string | null;
+  risk_profile: string | null;
+};
+
+export type CoreBankingDashboardData = {
+  database: {
+    name: string;
+    host: string;
+    engine: string;
+    schema: string;
+    generated_at: string;
+    latest_activity_at: string | null;
+  };
+  overview: Record<string, number>;
+  table_inventory: CoreBankingTableInventory[];
+  timeline: CoreBankingTimelinePoint[];
+  status_mix: CoreBankingMixItem[];
+  channel_mix: CoreBankingMixItem[];
+  transaction_types: CoreBankingMixItem[];
+  transfer_types: CoreBankingMixItem[];
+  account_segments: CoreBankingMixItem[];
+  risk_profiles: CoreBankingMixItem[];
+  top_accounts: CoreBankingTopAccount[];
+  recent_activity: CoreBankingActivity[];
+  sentinel: Record<string, unknown>;
+  batch_jobs: Record<string, string | number | null>[];
+};
+
 export type DbaAnalyzeResponse = {
   profiles_count: number;
   recommendations_count: number;
@@ -464,6 +537,18 @@ export function getQueryHistory() {
 
 export function getQueryMetadata() {
   return request<DatabaseInventory>("/api/query-governance/metadata");
+}
+
+export function getCoreBankingDashboard() {
+  return request<CoreBankingDashboardData>("/api/core-banking/dashboard");
+}
+
+export function getCoreBankingTables() {
+  return request<CoreBankingTableInventory[]>("/api/core-banking/tables");
+}
+
+export function getCoreBankingMovements(limit = 30) {
+  return request<CoreBankingActivity[]>(`/api/core-banking/movements?limit=${limit}`);
 }
 
 export function analyzeQuery(sql: string) {

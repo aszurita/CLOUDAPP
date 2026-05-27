@@ -100,6 +100,12 @@ variable "databricks_job_id" {
   default     = ""
 }
 
+variable "databricks_sql_warehouse_id" {
+  type        = string
+  description = "Optional Databricks SQL Warehouse ID used by Control Tower metadata queries."
+  default     = ""
+}
+
 variable "databricks_catalog" {
   type        = string
   description = "Databricks Unity Catalog/catalog name for DataOps assets."

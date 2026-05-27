@@ -35,6 +35,15 @@ resource "azurerm_log_analytics_workspace" "main" {
   tags                = local.tags
 }
 
+resource "azurerm_application_insights" "main" {
+  name                = "appi-${local.name_prefix}-${random_string.suffix.result}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  workspace_id        = azurerm_log_analytics_workspace.main.id
+  application_type    = "web"
+  tags                = local.tags
+}
+
 resource "azurerm_container_registry" "main" {
   name                = replace("acr${var.project_name}${var.environment}${random_string.suffix.result}", "-", "")
   resource_group_name = azurerm_resource_group.main.name
@@ -294,6 +303,11 @@ resource "azurerm_container_app" "backend" {
       }
 
       env {
+        name  = "DATABRICKS_SQL_WAREHOUSE_ID"
+        value = var.databricks_sql_warehouse_id
+      }
+
+      env {
         name  = "DATABRICKS_CATALOG"
         value = var.databricks_catalog
       }
@@ -389,6 +403,21 @@ resource "azurerm_container_app" "backend" {
       env {
         name  = "PURVIEW_ENABLED"
         value = tostring(var.purview_enabled)
+      }
+
+      env {
+        name  = "AZURE_KEY_VAULT_URL"
+        value = azurerm_key_vault.main.vault_uri
+      }
+
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.main.connection_string
+      }
+
+      env {
+        name  = "AZURE_POSTGRES_RESOURCE_ID"
+        value = azurerm_postgresql_flexible_server.main.id
       }
 
       env {

@@ -9,8 +9,10 @@ import {
   Database,
   ExternalLink,
   GitBranch,
+  LayoutDashboard,
   Mail,
   Network,
+  PackagePlus,
   Play,
   RefreshCw,
   SearchCheck,
@@ -25,6 +27,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { DashboardFactoryApp } from "./apps/dashboard-factory/DashboardFactoryApp";
+import { AppFactoryApp } from "./apps/app-factory/AppFactoryApp";
+import { CloudOpsAutopilotApp } from "./apps/cloudops-autopilot/CloudOpsAutopilotApp";
+import { DatabaseControlTowerApp } from "./apps/database-control-tower/DatabaseControlTowerApp";
+import { CoreBankingDashboard } from "./pages/core-banking/CoreBankingDashboard";
 import { SentinelDashboard } from "./pages/sentinel/SentinelDashboard";
 import {
   ApiError,
@@ -95,7 +102,8 @@ import {
 } from "./api";
 
 type LoadState = "loading" | "ready" | "error";
-type View = "overview" | "query" | "dba" | "dataops" | "catalog" | "autopilot" | "sentinel";
+type View = "overview" | "banking" | "query" | "dba" | "dataops" | "catalog" | "autopilot" | "sentinel";
+type Suite = "cloudops" | "database-control" | "dashboard-factory" | "app-factory" | "cloudops-autopilot";
 
 function statusTone(status: string) {
   if (status === "bronze") return "layer-bronze";
@@ -157,6 +165,174 @@ function formatQualityScore(value: number) {
 }
 
 export default function App() {
+  const [activeSuite, setActiveSuite] = useState<Suite | null>(null);
+
+  if (activeSuite === "cloudops") {
+    return <PlatformApp onBack={() => setActiveSuite(null)} />;
+  }
+
+  if (activeSuite === "database-control") {
+    return <DatabaseControlTowerApp onBack={() => setActiveSuite(null)} />;
+  }
+
+  if (activeSuite === "dashboard-factory") {
+    return <DashboardFactoryApp onBack={() => setActiveSuite(null)} />;
+  }
+
+  if (activeSuite === "app-factory") {
+    return <AppFactoryApp onBack={() => setActiveSuite(null)} />;
+  }
+
+  if (activeSuite === "cloudops-autopilot") {
+    return <CloudOpsAutopilotApp onBack={() => setActiveSuite(null)} />;
+  }
+
+  return <SuiteLauncher onSelect={setActiveSuite} />;
+}
+
+function SuiteLauncher({ onSelect }: { onSelect: (suite: Suite) => void }) {
+  return (
+    <main className="launcher-shell">
+      <section className="launcher-hero" aria-labelledby="launcher-title">
+        <div className="launcher-brand">
+          <span className="launcher-brand-mark">
+            <Sparkles size={24} aria-hidden="true" />
+          </span>
+          <span>Enterprise AI Operations Hub</span>
+        </div>
+        <p className="eyebrow">CloudOps · DataOps · Governance · Database Intelligence</p>
+        <h1 id="launcher-title">Selecciona el centro de operación</h1>
+        <p className="launcher-copy">
+          Cinco centros dentro de una sola plataforma: operaciones empresariales, control de bases, dashboards Databricks, generación de apps y operación Azure.
+        </p>
+        <div className="launcher-status-row">
+          <span>Local demo</span>
+          <span>Azure ready</span>
+          <span>AI enabled</span>
+        </div>
+      </section>
+
+      <section className="suite-grid" aria-label="Application suites">
+        <button className="suite-card suite-card-cloudops" onClick={() => onSelect("cloudops")}>
+          <span className="suite-card-head">
+            <span className="suite-icon">
+              <Network size={24} aria-hidden="true" />
+            </span>
+            <span className="suite-state">Disponible</span>
+          </span>
+          <span className="suite-kicker">Application 01</span>
+          <strong>CloudOps · DataOps · Governance</strong>
+          <span className="suite-copy">
+            Autopilot, gobierno de consultas, DBA Copilot, DataOps, catálogo y DB Sentinel AI.
+          </span>
+          <span className="suite-chip-row">
+            <span>Operations</span>
+            <span>Governance</span>
+            <span>Sentinel</span>
+          </span>
+          <span className="suite-open">
+            Entrar
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+
+        <button className="suite-card suite-card-database" onClick={() => onSelect("database-control")}>
+          <span className="suite-card-head">
+            <span className="suite-icon">
+              <Database size={24} aria-hidden="true" />
+            </span>
+            <span className="suite-state">Disponible</span>
+          </span>
+          <span className="suite-kicker">Application 02</span>
+          <strong>Database Control Tower AI</strong>
+          <span className="suite-copy">
+            Control Tower para PostgreSQL Docker, Azure PostgreSQL, Databricks, secretos, métricas y recomendaciones DBA.
+          </span>
+          <span className="suite-chip-row">
+            <span>PostgreSQL</span>
+            <span>Azure</span>
+            <span>Databricks</span>
+          </span>
+          <span className="suite-open">
+            Abrir Control Tower
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+
+        <button className="suite-card suite-card-factory" onClick={() => onSelect("dashboard-factory")}>
+          <span className="suite-card-head">
+            <span className="suite-icon">
+              <LayoutDashboard size={24} aria-hidden="true" />
+            </span>
+            <span className="suite-state">Disponible</span>
+          </span>
+          <span className="suite-kicker">Application 03</span>
+          <strong>Databricks Dashboard Factory</strong>
+          <span className="suite-copy">
+            Genera dashboards completos en Databricks desde un prompt. El sistema interpreta tu solicitud, construye el SQL, crea los widgets y publica el dashboard con un solo clic.
+          </span>
+          <span className="suite-chip-row">
+            <span>Prompt → SQL</span>
+            <span>Lakeview API</span>
+            <span>Auto-publish</span>
+          </span>
+          <span className="suite-open">
+            Abrir Factory
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+
+        <button className="suite-card suite-card-appfactory" onClick={() => onSelect("app-factory")}>
+          <span className="suite-card-head">
+            <span className="suite-icon">
+              <PackagePlus size={24} aria-hidden="true" />
+            </span>
+            <span className="suite-state">Disponible</span>
+          </span>
+          <span className="suite-kicker">Application 04</span>
+          <strong>AI Cloud App Factory</strong>
+          <span className="suite-copy">
+            Crea aplicaciones React + FastAPI + PostgreSQL desde un prompt, con Docker, Terraform, GitHub Actions y links finales.
+          </span>
+          <span className="suite-chip-row">
+            <span>Prompt → App</span>
+            <span>Terraform</span>
+            <span>Azure Ready</span>
+          </span>
+          <span className="suite-open">
+            Abrir App Factory
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+
+        <button className="suite-card suite-card-cloudautopilot" onClick={() => onSelect("cloudops-autopilot")}>
+          <span className="suite-card-head">
+            <span className="suite-icon">
+              <Server size={24} aria-hidden="true" />
+            </span>
+            <span className="suite-state">Disponible</span>
+          </span>
+          <span className="suite-kicker">Application 05</span>
+          <strong>CloudOps Autopilot Azure</strong>
+          <span className="suite-copy">
+            Opera apps generadas: readiness, recursos Azure, timeline de despliegue, secretos, monitoreo y costos.
+          </span>
+          <span className="suite-chip-row">
+            <span>Deploy Center</span>
+            <span>Azure Ops</span>
+            <span>Observability</span>
+          </span>
+          <span className="suite-open">
+            Abrir CloudOps
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+      </section>
+    </main>
+  );
+}
+
+function PlatformApp({ onBack }: { onBack: () => void }) {
   const [activeView, setActiveView] = useState<View>("overview");
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<PlatformStatus | null>(null);
@@ -224,6 +400,10 @@ export default function App() {
           <h1>Enterprise CloudOps & DataOps Autopilot</h1>
         </div>
         <div className="topbar-actions">
+          <button className="suite-switch" onClick={onBack}>
+            <ChevronRight size={16} aria-hidden="true" />
+            Cambiar suite
+          </button>
           <StatusBadge value={status.database} />
           <StatusBadge value={status.ai_configured ? "configured" : "blocked"} />
         </div>
@@ -232,6 +412,10 @@ export default function App() {
       <nav className="view-tabs" aria-label="Platform views">
         <button className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")}>
           Platform Overview
+        </button>
+        <button className={activeView === "banking" ? "active" : ""} onClick={() => setActiveView("banking")}>
+          <LayoutDashboard size={15} aria-hidden="true" />
+          Core Banking Dashboard
         </button>
         <button className={activeView === "query" ? "active" : ""} onClick={() => setActiveView("query")}>
           Query Governance
@@ -259,6 +443,7 @@ export default function App() {
       {activeView === "overview" && (
         <Overview status={status} environments={environments} services={services} deployments={deployments} />
       )}
+      {activeView === "banking" && <CoreBankingDashboard />}
       {activeView === "query" && <QueryGovernance />}
       {activeView === "dba" && <DbaCopilot />}
       {activeView === "dataops" && <DataOpsMonitor onRunStatusChange={setDataOpsRunningRun} />}

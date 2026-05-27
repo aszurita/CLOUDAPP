@@ -40,6 +40,27 @@ output "key_vault_name" {
   value = azurerm_key_vault.main.name
 }
 
+output "key_vault_url" {
+  value = azurerm_key_vault.main.vault_uri
+}
+
+output "application_insights_name" {
+  value = azurerm_application_insights.main.name
+}
+
+output "applicationinsights_connection_string" {
+  value     = azurerm_application_insights.main.connection_string
+  sensitive = true
+}
+
+output "log_analytics_workspace_id" {
+  value = azurerm_log_analytics_workspace.main.id
+}
+
 output "postgres_server_fqdn" {
   value = azurerm_postgresql_flexible_server.main.fqdn
+}
+
+output "postgres_server_resource_id" {
+  value = azurerm_postgresql_flexible_server.main.id
 }

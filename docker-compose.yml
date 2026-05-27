@@ -6,6 +6,7 @@ networks:
 
 volumes:
   cloudapp_pg_data:
+  controltower_pg_data:
 
 services:
 
@@ -23,6 +24,27 @@ services:
       - cloudapp_pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cloudapp -d cloudapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudapp_net
+
+  # Base interna de Database Control Tower AI (snapshots, inventario e historial)
+  controltower-postgres:
+    image: postgres:16-alpine
+    container_name: controltower_postgres
+    environment:
+      POSTGRES_USER: controltower
+      POSTGRES_PASSWORD: controltower_pass
+      POSTGRES_DB: controltower
+    ports:
+      - "5440:5432"
+    volumes:
+      - controltower_pg_data:/var/lib/postgresql/data
+      - ./backend/db-init/controltower:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U controltower -d controltower"]
       interval: 10s
       timeout: 5s
       retries: 5

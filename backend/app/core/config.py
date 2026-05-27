@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "Enterprise CloudOps & DataOps Autopilot"
     environment: str = "local"
     api_prefix: str = "/api"
-    database_url: str = "sqlite:///./cloudapp.db"
+    database_url: str = "postgresql+psycopg://cloudapp:cloudapp_pass@localhost:5432/cloudapp"
     frontend_origins: str = "http://localhost:5173"
     ai_provider: str = "openai"
     openai_api_key: str | None = None
@@ -22,10 +22,15 @@ class Settings(BaseSettings):
     databricks_host: str | None = None
     databricks_token: str | None = None
     databricks_job_id: str | None = None
+    databricks_gold_factory_job_id: str = "543723094102095"
+    databricks_control_catalog: str = "databricks_proyectobg"
+    databricks_control_schema: str = "controldatabricks"
+    databricks_control_requests_table: str = "dataops_requests"
     databricks_catalog: str = "databricks_proyectobg"
     databricks_schema_bronze: str = "tpcds_bronze"
     databricks_schema_silver: str = "tpcds_silver"
     databricks_schema_gold: str = "tpcds_gold"
+    gold_factory_database_url: str | None = None
     dataops_pipelines_json: str | None = None
     datahub_server: str | None = None
     datahub_token: str | None = None
@@ -37,6 +42,23 @@ class Settings(BaseSettings):
     purview_client_id: str | None = None
     purview_client_secret: str | None = None
     purview_enabled: bool = False
+
+    # ── Database Control Tower AI ────────────────────────────────────────────
+    controltower_database_url: str | None = None
+    azure_postgres_host: str | None = None
+    azure_postgres_port: int = 5432
+    azure_postgres_db: str = "cloudapp"
+    azure_postgres_user: str | None = None
+    azure_postgres_password: str | None = None
+    azure_postgres_sslmode: str = "require"
+    azure_postgres_resource_id: str | None = None
+    databricks_sql_warehouse_id: str | None = None
+    applicationinsights_connection_string: str | None = None
+    applicationinsights_live_metrics_enabled: bool = False
+    azure_key_vault_url: str | None = None
+    azure_tenant_id: str | None = None
+    azure_client_id: str | None = None
+    azure_client_secret: str | None = None
 
     # ── DB Sentinel AI ────────────────────────────────────────────────────────
     sentinel_monitor_db_url: str | None = None

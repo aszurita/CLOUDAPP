@@ -15,6 +15,7 @@ from app.models.dataops import (
     DataOpsQualityCheck,
     DataOpsQuarantineEvent,
 )
+from app.models.dashboard_factory import Dashboard, DashboardGenerationHistory, GoldFactoryRequestRecord
 from app.models.governance import (
     DbaRecommendation,
     DbaTableProfile,
@@ -41,6 +42,9 @@ __all__ = [
     "DataOpsPipelineRun",
     "DataOpsQualityCheck",
     "DataOpsQuarantineEvent",
+    "DashboardGenerationHistory",
+    "Dashboard",
+    "GoldFactoryRequestRecord",
     "Deployment",
     "Environment",
     "PlatformSetting",

@@ -6,10 +6,16 @@ from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
 from app.main import app
 from app.services.ai import AIRecommendationService
+from app.services.dashboard_factory import DashboardFactoryService
 from app.services.seed import seed_demo_data
 
 
 def setup_module() -> None:
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError(
+            "Tests require an isolated SQLite database. "
+            "Refusing to run Base.metadata.drop_all() against a non-SQLite database."
+        )
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
@@ -264,6 +270,98 @@ def test_dataops_monitor_supports_configured_databricks_jobs(monkeypatch) -> Non
     assert "riesgo-clientes-gold" in pipelines
     assert pipelines["riesgo-clientes-gold"]["databricks_job_id"] == "123456789"
     assert pipelines["riesgo-clientes-gold"]["config_json"]["summary_task_key"] == "emit_run_summary"
+
+
+def test_gold_factory_submit_persists_history() -> None:
+    prompt = "Crear una Gold de ventas mensuales por categoria"
+    plan_response = client.post(
+        "/api/dashboard-factory/gold/plan",
+        json={
+            "prompt": prompt,
+            "target_catalog": "databricks_proyectobg",
+            "target_schema": "tpcds_gold",
+            "object_type": "TABLE",
+        },
+    )
+    assert plan_response.status_code == 200
+    plan = plan_response.json()
+    assert plan["validation_status"] == "APPROVED"
+
+    submit_response = client.post(
+        "/api/dashboard-factory/gold/submit",
+        json={
+            "prompt": prompt,
+            "plan": plan,
+            "write_mode": "OR_REPLACE",
+            "created_by": "test-user",
+        },
+    )
+    assert submit_response.status_code == 200
+    submitted = submit_response.json()
+    assert submitted["status"] == "DEMO_SUCCESS"
+
+    status_response = client.get(f"/api/dashboard-factory/gold/requests/{submitted['request_id']}")
+    history_response = client.get("/api/dashboard-factory/gold/history")
+
+    assert status_response.status_code == 200
+    assert status_response.json()["target_table"] == submitted["target_table"]
+    assert status_response.json()["databricks_run_id"] is None
+    assert history_response.status_code == 200
+    assert any(item["request_id"] == submitted["request_id"] for item in history_response.json())
+
+
+def test_gold_factory_repairs_quality_literal_aliases() -> None:
+    service = DashboardFactoryService()
+    catalog = service._demo_catalog_snapshot("databricks_proyectobg")
+    plan = {"source_tables": ["databricks_proyectobg.tpcds_silver.store_sales_clean"]}
+    source_sql = (
+        "SELECT store_sales_clean AS table_name, ss_quantity_negative AS failed_rule, "
+        "COUNT(*) AS failed_records "
+        "FROM databricks_proyectobg.tpcds_silver.store_sales_clean "
+        "WHERE ss_quantity < 0 "
+        "GROUP BY store_sales_clean, ss_quantity_negative"
+    )
+
+    repaired = service._repair_gold_source_sql(source_sql, plan, catalog)
+
+    assert "'store_sales_clean' AS table_name" in repaired
+    assert "'ss_quantity_negative' AS failed_rule" in repaired
+    assert "GROUP BY 'store_sales_clean', 'ss_quantity_negative'" in repaired
+
+
+def test_gold_factory_submit_records_databricks_run(monkeypatch) -> None:
+    service = DashboardFactoryService()
+    service.settings.databricks_host = "https://adb-12345.1.azuredatabricks.net"
+    service.settings.databricks_token = "token"
+    service.settings.databricks_sql_warehouse_id = "warehouse"
+    service.settings.databricks_gold_factory_job_id = "54321"
+    monkeypatch.setattr(service, "_databricks_ready", lambda: True)
+    monkeypatch.setattr(service, "_insert_control_request", lambda **_: None)
+    monkeypatch.setattr(service, "_start_gold_factory_job", lambda request_id: {"run_id": 98765})
+    plan = {
+        "target_catalog": "databricks_proyectobg",
+        "target_schema": "tpcds_gold",
+        "target_name": "sales_by_month_category",
+        "object_type": "TABLE",
+        "source_tables": ["databricks_proyectobg.tpcds_silver.store_sales_clean"],
+        "source_sql": "SELECT ss_store_sk, COUNT(*) AS total FROM databricks_proyectobg.tpcds_silver.store_sales_clean GROUP BY ss_store_sk",
+        "validation_messages": [],
+    }
+
+    with SessionLocal() as db:
+        response = service.submit_gold_request(
+            "Crear Gold de ventas",
+            plan,
+            "OR_REPLACE",
+            "test-user",
+            db,
+        )
+
+    assert response["status"] == "PENDING"
+    assert response["databricks_run_id"] == "98765"
+    assert response["databricks_run_url"] == (
+        "https://adb-12345.1.azuredatabricks.net/?o=12345#job/54321/run/98765"
+    )
 
 
 def test_catalog_sync_creates_assets_columns_and_lineage() -> None:

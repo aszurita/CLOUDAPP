@@ -20,6 +20,7 @@ npm-debug.log*
 !*.tfvars.example
 crash.log
 respuesta.md
+generated-apps/
 *.tfplan
 override.tf
 override.tf.json

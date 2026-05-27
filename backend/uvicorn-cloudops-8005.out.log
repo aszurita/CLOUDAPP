@@ -1,0 +1,208 @@
+2026-05-27 09:23:37,841 WARNING app.core.telemetry Application Insights telemetry could not be enabled: app.core.telemetry._set_telemetry_status() got multiple values for keyword argument 'enabled'
+2026-05-27 09:23:37,986 INFO app.services.sentinel.collector_service Collector iniciado — db=core_banking_sim intervalo=60s
+2026-05-27 09:23:38,101 INFO app.services.sentinel.collector_service Telemetría recolectada — db=core_banking_sim active=0 lock_waiting=0 cache=88.72%
+2026-05-27 09:23:42,833 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '2363'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'a9e40df8-59d7-11f1-b0ee-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:23:43,544 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:23:43 GMT'
+2026-05-27 09:23:43,547 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 3. Items accepted: 3
+2026-05-27 09:23:55,952 INFO app.core.telemetry request_completed method=GET path=/api/cloudops-autopilot status_code=200 duration_ms=13951.42
+INFO:     127.0.0.1:61399 - "GET /api/cloudops-autopilot HTTP/1.1" 200 OK
+2026-05-27 09:23:57,837 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '4616'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'b2d578a3-59d7-11f1-b561-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:23:58,566 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '769'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'b344c02c-59d7-11f1-919e-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:23:58,659 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:23:57 GMT'
+2026-05-27 09:23:58,662 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 5. Items accepted: 5
+2026-05-27 09:23:58,769 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:23:58 GMT'
+2026-05-27 09:23:58,771 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 1. Items accepted: 1
+2026-05-27 09:24:26,069 INFO app.core.telemetry request_completed method=GET path=/api/cloudops-autopilot status_code=200 duration_ms=17244.15
+INFO:     127.0.0.1:57552 - "GET /api/cloudops-autopilot HTTP/1.1" 200 OK
+2026-05-27 09:24:28,704 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '4616'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'c53b8185-59d7-11f1-9413-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:24:28,812 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '769'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'c54bf446-59d7-11f1-a08b-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:24:28,972 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:24:28 GMT'
+2026-05-27 09:24:28,973 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 5. Items accepted: 5
+2026-05-27 09:24:29,194 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:24:28 GMT'
+2026-05-27 09:24:29,195 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 1. Items accepted: 1
+2026-05-27 09:24:37,807 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '8327'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'caa8714e-59d7-11f1-8151-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:24:38,233 INFO app.services.sentinel.collector_service Telemetría recolectada — db=core_banking_sim active=0 lock_waiting=0 cache=88.72%
+2026-05-27 09:24:38,565 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:24:38 GMT'
+2026-05-27 09:24:38,568 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 13. Items accepted: 13
+2026-05-27 09:24:39,218 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '787'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'cb7fd0d1-59d7-11f1-9107-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:24:39,432 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:24:39 GMT'
+2026-05-27 09:24:39,435 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 1. Items accepted: 1
+2026-05-27 09:25:38,375 INFO app.services.sentinel.collector_service Telemetría recolectada — db=core_banking_sim active=0 lock_waiting=0 cache=88.73%
+2026-05-27 09:25:38,574 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '5507'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'eee0c2b0-59d7-11f1-b01f-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:25:38,873 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:25:38 GMT'
+2026-05-27 09:25:38,874 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 9. Items accepted: 9
+2026-05-27 09:25:39,524 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '787'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'ef71bca3-59d7-11f1-b7d9-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:25:39,823 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:25:39 GMT'
+2026-05-27 09:25:39,824 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 1. Items accepted: 1
+2026-05-27 09:26:38,502 INFO app.services.sentinel.collector_service Telemetría recolectada — db=core_banking_sim active=0 lock_waiting=0 cache=88.73%
+2026-05-27 09:26:38,886 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '5507'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': '12d3a45a-59d8-11f1-a03f-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:26:39,106 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:26:38 GMT'
+2026-05-27 09:26:39,109 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 9. Items accepted: 9
+2026-05-27 09:26:39,941 INFO azure.core.pipeline.policies.http_logging_policy Request URL: 'https://eastus-8.in.applicationinsights.azure.com//v2.1/track'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '787'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': '13748cc3-59d8-11f1-b35e-a864f11c9ce7'
+    'User-Agent': 'azsdk-python-monitor-opentelemetry-exporter/1.0.0b1 Python/3.13.13 (Windows-11-10.0.26200-SP0)'
+A body is sent with the request
+2026-05-27 09:26:40,149 INFO azure.core.pipeline.policies.http_logging_policy Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json; charset=utf-8'
+    'Server': 'Microsoft-HTTPAPI/2.0'
+    'Strict-Transport-Security': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Wed, 27 May 2026 14:26:39 GMT'
+2026-05-27 09:26:40,150 INFO azure.monitor.opentelemetry.exporter.export._base Transmission succeeded: Item received: 1. Items accepted: 1
